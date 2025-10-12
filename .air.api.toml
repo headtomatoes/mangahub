@@ -1,0 +1,32 @@
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  args_bin = []
+  bin = "./tmp/api-server"
+  cmd = "go build -o ./tmp/api-server ./cmd/api-server"
+  delay = 1000
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "docs"]
+  exclude_file = []
+  exclude_regex = ["_test.go", ".*_pb.go"]
+  include_ext = ["go"]
+  kill_delay = "2s"
+  log = "api-build-errors.log"
+  send_interrupt = true
+
+[color]
+  app = "blue"
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = false
+
+[screen]
+  clear_on_rebuild = true

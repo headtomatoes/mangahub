@@ -1,0 +1,26 @@
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  args_bin = []
+  bin = "./tmp/grpc-server"
+  cmd = "go build -o ./tmp/grpc-server ./cmd/grpc-server"
+  delay = 1000
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "docs"]
+  exclude_file = []
+  exclude_regex = ["_test.go", ".*_pb.go"]
+  include_ext = ["go", "proto"]
+  kill_delay = "2s"
+  log = "grpc-build-errors.log"
+  send_interrupt = true
+
+[color]
+  app = "green"
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  time = true

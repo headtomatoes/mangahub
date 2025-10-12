@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # HTTP API Server (Gin)
+  api-server:
+    build:
+      context: .
+      target: ${GO_ENV:-development}
+    container_name: mangahub-api
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # Debugger port
+    volumes:
+      - .:/app
+      - /app/tmp
+      - sqlite_data:/app/data
+    environment:
+      - GO_ENV=${GO_ENV:-development}
+      - SERVICE_NAME=api-server
+      - HTTP_PORT=8080
+      - DATABASE_URL=/app/data/mangahub.db
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
+    command: ["air", "-c", ".air.api.toml"]
+    networks:
+      - mangahub-network
+    depends_on:
+      - redis
+
+  # TCP Sync Server
+  tcp-server:
+    build:
+      context: .
+      target: ${GO_ENV:-development}  
+    container_name: mangahub-tcp
+    ports:
+      - "8081:8081"
+    volumes:
+      - .:/app
+      - /app/tmp
+      - sqlite_data:/app/data
+    environment:
+      - GO_ENV=${GO_ENV:-development}
+      - SERVICE_NAME=tcp-server
+      - TCP_PORT=8081
+      - DATABASE_URL=/app/data/mangahub.db
+    command: ["air", "-c", ".air.tcp.toml"]
+    networks:
+      - mangahub-network
+
+  # UDP Notify Server
+  udp-server:
+    build:
+      context: .
+      target: ${GO_ENV:-development}
+    container_name: mangahub-udp
+    ports:
+      - "8082:8082/udp"
+    volumes:
+      - .:/app
+      - /app/tmp
+      - sqlite_data:/app/data
+    environment:
+      - GO_ENV=${GO_ENV:-development}
+      - SERVICE_NAME=udp-server
+      - UDP_PORT=8082
+      - DATABASE_URL=/app/data/mangahub.db
+    command: ["air", "-c", ".air.udp.toml"]
+    networks:
+      - mangahub-network
+
+  # gRPC Server
+  grpc-server:
+    build:
+      context: .
+      target: ${GO_ENV:-development}
+    container_name: mangahub-grpc
+    ports:
+      - "8083:8083"
+    volumes:
+      - .:/app
+      - /app/tmp
+      - sqlite_data:/app/data
+    environment:
+      - GO_ENV=${GO_ENV:-development}
+      - SERVICE_NAME=grpc-server
+      - GRPC_PORT=8083
+      - DATABASE_URL=/app/data/mangahub.db
+    command: ["air", "-c", ".air.grpc.toml"]
+    networks:
+      - mangahub-network
+
+  # Redis Cache (Optional bonus feature)
+  redis:
+    image: redis:7-alpine
+    container_name: mangahub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mangahub-network
+
+  # Prometheus (Optional monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mangahub-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - mangahub-network
+    profiles:
+      - monitoring
+
+  # Grafana (Optional monitoring)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mangahub-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    networks:
+      - mangahub-network
+    profiles:
+      - monitoring
+
+volumes:
+  sqlite_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  mangahub-network:
+    driver: bridge
