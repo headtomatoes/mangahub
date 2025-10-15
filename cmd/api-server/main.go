@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,6 +20,12 @@ func main() {
 	r.Use(gin.Recovery())
 
 	httpServer := fmt.Sprintf("127.0.0.1:%d", cfg.HTTPPort)
+
+	r.GET("/check-conn", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "it's happening",
+		})
+	})
 
 	r.Run(httpServer)
 }

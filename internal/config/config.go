@@ -56,7 +56,7 @@ type Config struct {
 // LoadConfig loads configuration from environment variables
 func LoadConfig() (*Config, error) {
 	// Try to load .env file from project root (adjust path as needed)
-	err := godotenv.Load("../../.env") // Go up two levels from test/config to project root
+	err := godotenv.Load(".env") // Go up two levels from test/config to project root
 	if err != nil {
 		// If .env file doesn't exist, that's OK - we can still use system env vars
 		// Only log this in development, don't fail

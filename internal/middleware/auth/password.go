@@ -5,6 +5,7 @@ import (
 )
 
 // Hashpassword creates a bcrypt hash from the given plaintext password.
+// return the hashed string + error obj
 func Hashpassword(password string) (string, error) {
 	// the cost determines the computational complexity of the hashing process
 	// higher cost means more security but also more processing time

@@ -13,6 +13,7 @@ type User struct {
 	Passwork_hash string     `json:"-" db:"password_hash"`
 	Email         string     `json:"email" db:"email"`
 	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 	Last_login    *time.Time `json:"last_login,omitempty" db:"last_login"`
 }
 
@@ -37,9 +38,10 @@ func (r *UserRepository) CreateUser(email, username, passwordHash string) (*User
 		Username:      username,
 		Passwork_hash: passwordHash,
 		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
-	query := `INSERT INTO users (id, email, username, password_hash, created_at) VALUES ($1, $2, $3, $4, $5)`
+	query := `INSERT INTO users (id, email, username, password_hash, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`
 
 	_, err := r.db.Exec(query, user.ID, user.Email, user.Username, user.Passwork_hash, user.CreatedAt)
 	if err != nil {
@@ -49,7 +51,7 @@ func (r *UserRepository) CreateUser(email, username, passwordHash string) (*User
 }
 
 func (r *UserRepository) GetUserByID(id uuid.UUID) (*User, error) {
-	query := `SELECT id, email, username, password_hash, created_at, last_login FROM users WHERE id = $1`
+	query := `SELECT id, email, username, password_hash, created_at, updated_at, last_login FROM users WHERE id = $1`
 
 	var user User
 	var lastLogin sql.NullTime
