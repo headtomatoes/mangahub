@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS ratings;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS user_progress;
+DROP TABLE IF EXISTS manga_genres;
+DROP TABLE IF EXISTS genres;
+DROP TABLE IF EXISTS manga;
+DROP TABLE IF EXISTS users;

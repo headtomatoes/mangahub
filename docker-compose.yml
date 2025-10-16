@@ -1,6 +1,22 @@
 version: '3.8'
 
+
 services:
+# Database (PostgreSQL)
+  db:
+    image: postgres:15
+    container_name: mangahub_db
+    restart: always
+    environment:
+      POSTGRES_USER: mangahub
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: mangahub
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./database/data:/var/lib/postgresql/data
+
   # HTTP API Server (Gin)
   api-server:
     build:

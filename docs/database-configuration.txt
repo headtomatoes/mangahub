@@ -1,0 +1,14 @@
+- initialize the database image: docker compose up -d db
+
+- Check is it available or note: docker ps
+
+
+- work with database server: docker exec -it mangahub_db psql -U mangahub -d mangahub
+
+- \dt for see all table 
+- \q: quit
+
+-- if after running docker for database but the table is empty, let do:
+docker cp ./database/migrations/001_init.up.sql mangahub_db:/tmp/schema.sql
+docker exec -it mangahub_db psql -U mangahub -d mangahub -f /tmp/schema.sql
+-- and re-open the database server
