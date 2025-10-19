@@ -3,13 +3,13 @@ package service
 import (
 	"errors"
 	"mangahub/internal/config"
-	"mangahub/internal/microservices/http-api/middleware/auth"
 	"mangahub/internal/microservices/http-api/models"
 	"mangahub/internal/microservices/http-api/repository"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -65,7 +65,7 @@ func (s *authService) Register(username, password, email string) (*models.User, 
 		return nil, ErrEmailInUse
 	}
 	// Hash password
-	hashedPassword, err := auth.HashPassword(password)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
@@ -92,12 +92,12 @@ func (s *authService) Login(username, password string) (string, string, *models.
 	user, err := s.userRepo.FindByUsername(username)
 	if err != nil {
 		// User not found we use dummy compare to mitigate timing attacks (always take same time)
-		auth.VerifyPassword("$2a$10$7EqJtq98hPqEX7fNZaFWoOHi6VbU5h6K9v8u5rO0m3j0h6dX5r8e", password)
+		_ = bcrypt.CompareHashAndPassword([]byte("$2a$10$7EqJtq98hPqEX7fNZaFWoOhi6Cq1h0u3b0j3Z6h5y5jY5f5h5F5eW"), []byte(password))
 		return "", "", nil, ErrInvalidCredentials
 	}
 
 	// Verify password
-	if err := auth.VerifyPassword(user.Password, password); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return "", "", nil, ErrInvalidCredentials
 	}
 
