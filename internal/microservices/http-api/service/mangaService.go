@@ -1,0 +1,131 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+
+	// "time"
+
+	"github.com/google/uuid"
+
+	"mangahub/internal/microservices/http-api/models"
+	"mangahub/internal/microservices/http-api/repository"
+)
+
+type MangaService interface {
+	GetAll(ctx context.Context) ([]models.Manga, error)
+	GetByID(ctx context.Context, id int64) (*models.Manga, error)
+	Create(ctx context.Context, m *models.Manga) error
+	Update(ctx context.Context, id int64, m *models.Manga) error
+	Delete(ctx context.Context, id int64) error
+}
+
+type mangaService struct {
+	repo *repository.MangaRepo
+}
+
+func NewMangaService(r *repository.MangaRepo) MangaService {
+	return &mangaService{repo: r}
+}
+
+func (s *mangaService) GetAll(ctx context.Context) ([]models.Manga, error) {
+	return s.repo.GetAll(ctx)
+}
+
+func (s *mangaService) GetByID(ctx context.Context, id int64) (*models.Manga, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *mangaService) Create(ctx context.Context, m *models.Manga) error {
+	// basic validation
+	if strings.TrimSpace(m.Title) == "" {
+		return errors.New("title is required")
+	}
+
+	// ensure slug exists, generate from title if missing
+	if m.Slug == nil || strings.TrimSpace(*m.Slug) == "" {
+		slug := generateSlug(m.Title)
+		// add short uuid suffix to avoid collisions
+		slug = fmt.Sprintf("%s-%s", slug, uuid.New().String()[:8])
+		m.Slug = &slug
+	}
+
+	// business rules can go here (e.g. normalize fields)
+	if m.Author != nil {
+		a := strings.TrimSpace(*m.Author)
+		m.Author = &a
+	}
+
+	return s.repo.Create(ctx, m)
+}
+
+func (s *mangaService) Update(ctx context.Context, id int64, m *models.Manga) error {
+	// ensure exists
+	existing, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// merge minimal validation/business logic
+	if strings.TrimSpace(m.Title) == "" && (m.Slug == nil || *m.Slug == "") {
+		// allow updates that don't change title/slug but require at least one non-empty field
+		// We won't reject if other fields present
+	}
+
+	// Apply fields that are non-nil / non-zero in m to existing
+	if m.Slug != nil {
+		existing.Slug = m.Slug
+	}
+	if strings.TrimSpace(m.Title) != "" {
+		existing.Title = m.Title
+	}
+	if m.Author != nil {
+		existing.Author = m.Author
+	}
+	if m.Status != nil {
+		existing.Status = m.Status
+	}
+	if m.TotalChapters != nil {
+		existing.TotalChapters = m.TotalChapters
+	}
+	if m.Description != nil {
+		existing.Description = m.Description
+	}
+	if m.CoverURL != nil {
+		existing.CoverURL = m.CoverURL
+	}
+
+	// update updated_at business rule could be here
+
+	return s.repo.Update(ctx, id, existing)
+}
+
+func (s *mangaService) Delete(ctx context.Context, id int64) error {
+	// potential pre-delete checks (dependencies) could be here
+	return s.repo.Delete(ctx, id)
+}
+
+/* helper: generate slug-like string from title */
+var nonAlnum = regexp.MustCompile(`[^a-z0-9\-]+`)
+
+func generateSlug(title string) string {
+	s := strings.ToLower(strings.TrimSpace(title))
+	// replace spaces with dash
+	s = strings.ReplaceAll(s, " ", "-")
+	// remove non-alnum/dash
+	s = nonAlnum.ReplaceAllString(s, "")
+	// collapse dashes
+	s = strings.ReplaceAll(s, "--", "-")
+	s = strings.Trim(s, "-")
+	if s == "" {
+		return "manga"
+	}
+	// limit length
+	if len(s) > 50 {
+		s = s[:50]
+	}
+	return s
+}

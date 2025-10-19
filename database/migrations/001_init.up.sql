@@ -1,12 +1,22 @@
+-- CREATE SCHEMA from scratch with integer auto-increment IDs
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-
 
 -- ========================================
 -- USERS
 -- ========================================
+DROP TABLE IF EXISTS ratings CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
+DROP TABLE IF EXISTS user_sessions CASCADE;
+DROP TABLE IF EXISTS chat_messages CASCADE;
+DROP TABLE IF EXISTS user_progress CASCADE;
+DROP TABLE IF EXISTS manga_genres CASCADE;
+DROP TABLE IF EXISTS genres CASCADE;
+DROP TABLE IF EXISTS manga CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id BIGSERIAL PRIMARY KEY,
+    uuid UUID DEFAULT gen_random_uuid(), -- keep uuid if needed
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -19,7 +29,8 @@ CREATE TABLE users (
 -- MANGA
 -- ========================================
 CREATE TABLE manga (
-    id TEXT PRIMARY KEY,  -- slug-based ID
+    id BIGSERIAL PRIMARY KEY,
+    slug TEXT UNIQUE, -- keep original text slug if you used it
     title TEXT NOT NULL,
     author TEXT,
     status TEXT CHECK(status IN ('ongoing', 'completed', 'hiatus')),
@@ -44,75 +55,68 @@ CREATE TABLE genres (
 -- MANGA ↔ GENRES (Many-to-Many)
 -- ========================================
 CREATE TABLE manga_genres (
-    manga_id TEXT NOT NULL,
-    genre_id INTEGER NOT NULL,
-    PRIMARY KEY (manga_id, genre_id),
-    FOREIGN KEY (manga_id) REFERENCES manga(id) ON DELETE CASCADE,
-    FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE CASCADE
+    id BIGSERIAL PRIMARY KEY,
+    manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
+    genre_id INTEGER NOT NULL REFERENCES genres(id) ON DELETE CASCADE,
+    UNIQUE (manga_id, genre_id)
 );
 
 -- ========================================
 -- USER PROGRESS
 -- ========================================
 CREATE TABLE user_progress (
-    user_id UUID NOT NULL,
-    manga_id TEXT NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
     current_chapter INTEGER DEFAULT 0,
     status TEXT CHECK(status IN ('reading', 'completed', 'plan_to_read', 'dropped')),
     rating INTEGER CHECK(rating >= 1 AND rating <= 10),
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, manga_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (manga_id) REFERENCES manga(id) ON DELETE CASCADE
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ========================================
 -- CHAT MESSAGES
 -- ========================================
 CREATE TABLE chat_messages (
-    id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     username TEXT NOT NULL,
     message TEXT NOT NULL,
-    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ========================================
 -- USER SESSIONS
 -- ========================================
 CREATE TABLE user_sessions (
-    token_id TEXT PRIMARY KEY,
-    user_id UUID NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    token TEXT UNIQUE NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ========================================
 -- COMMENTS
 -- ========================================
 CREATE TABLE comments (
-    comment_id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL,
-    manga_id TEXT NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (manga_id) REFERENCES manga(id) ON DELETE CASCADE
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ========================================
 -- RATINGS
 -- ========================================
 CREATE TABLE ratings (
-    user_id UUID NOT NULL,
-    manga_id TEXT NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
     rating INTEGER CHECK(rating >= 1 AND rating <= 10),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, manga_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (manga_id) REFERENCES manga(id) ON DELETE CASCADE
+    UNIQUE (user_id, manga_id)
 );
