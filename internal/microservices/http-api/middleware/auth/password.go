@@ -4,9 +4,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Hashpassword creates a bcrypt hash from the given plaintext password.
+// HashPassword creates a bcrypt hash from the given plaintext password.
 // return the hashed string + error obj
-func Hashpassword(password string) (string, error) {
+func HashPassword(password string) (string, error) {
 	// the cost determines the computational complexity of the hashing process
 	// higher cost means more security but also more processing time
 	// default cost is 10, we can adjust based on our security needs and performance considerations
