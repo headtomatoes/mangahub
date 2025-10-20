@@ -20,7 +20,7 @@ func NewMangaRepo(db *gorm.DB) *MangaRepo {
 
 func (r *MangaRepo) GetAll(ctx context.Context) ([]models.Manga, error) {
 	var list []models.Manga
-	if err := r.db.WithContext(ctx).Order("created_at desc").Find(&list).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Genres").Order("created_at desc").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -28,7 +28,7 @@ func (r *MangaRepo) GetAll(ctx context.Context) ([]models.Manga, error) {
 
 func (r *MangaRepo) GetByID(ctx context.Context, id int64) (*models.Manga, error) {
 	var m models.Manga
-	if err := r.db.WithContext(ctx).First(&m, id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Preload("Genres").First(&m, id).Error; err != nil {
 		return nil, err
 	}
 	return &m, nil
@@ -87,4 +87,55 @@ func (r *MangaRepo) SearchByTitle(ctx context.Context, title string) ([]models.M
 		return nil, fmt.Errorf("search manga by title/author: %w", err)
 	}
 	return list, nil
+}
+
+func (r *MangaRepo) GetGenresByManga(ctx context.Context, mangaID int64) ([]models.Genre, error) {
+	var m models.Manga
+	if err := r.db.WithContext(ctx).Preload("Genres").First(&m, mangaID).Error; err != nil {
+		return nil, fmt.Errorf("get manga: %w", err)
+	}
+	return m.Genres, nil
+}
+
+func (r *MangaRepo) AddGenresToManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
+	if len(genreIDs) == 0 {
+		return nil
+	}
+	tx := r.db.WithContext(ctx).Begin()
+	var m models.Manga
+	if err := tx.First(&m, mangaID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("manga not found: %w", err)
+	}
+	// build genre placeholders (only IDs needed)
+	genres := make([]models.Genre, 0, len(genreIDs))
+	for _, id := range genreIDs {
+		genres = append(genres, models.Genre{ID: id})
+	}
+	if err := tx.Model(&m).Association("Genres").Append(&genres); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("append genres: %w", err)
+	}
+	return tx.Commit().Error
+}
+
+func (r *MangaRepo) RemoveGenresFromManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
+	if len(genreIDs) == 0 {
+		return nil
+	}
+	tx := r.db.WithContext(ctx).Begin()
+	var m models.Manga
+	if err := tx.First(&m, mangaID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("manga not found: %w", err)
+	}
+	genres := make([]models.Genre, 0, len(genreIDs))
+	for _, id := range genreIDs {
+		genres = append(genres, models.Genre{ID: id})
+	}
+	if err := tx.Model(&m).Association("Genres").Delete(&genres); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("remove genres: %w", err)
+	}
+	return tx.Commit().Error
 }

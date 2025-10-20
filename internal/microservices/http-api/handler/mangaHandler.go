@@ -29,6 +29,11 @@ func (h *MangaHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/", h.Create)
 	rg.PUT("/:id", h.Update)
 	rg.DELETE("/:id", h.Delete)
+
+	// genres for a manga
+	rg.GET("/:id/genres", h.GetMangaGenres)
+	rg.POST("/:id/genres", h.AddMangaGenres)
+	rg.DELETE("/:id/genres", h.RemoveMangaGenres)
 }
 
 func (h *MangaHandler) List(c *gin.Context) {
@@ -159,4 +164,70 @@ func (h *MangaHandler) SearchByTitle(c *gin.Context) {
 		resp = append(resp, dto.FromModelToResponse(m))
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *MangaHandler) GetMangaGenres(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	list, err := h.svc.GetGenresByManga(ctx, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	resp := make([]dto.GenreResponse, 0, len(list))
+	for _, g := range list {
+		resp = append(resp, dto.GenreFromModel(g))
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *MangaHandler) AddMangaGenres(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var in dto.GenreIDsRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.svc.AddGenresToManga(ctx, id, in.GenreIDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h *MangaHandler) RemoveMangaGenres(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	var in dto.GenreIDsRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.svc.RemoveGenresFromManga(ctx, id, in.GenreIDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// Auto-migrate manga model (safe for dev; careful in prod)
-	if err := gdb.AutoMigrate(&models.Manga{}); err != nil {
+	if err := gdb.AutoMigrate(&models.Manga{}, &models.Genre{}, &models.MangaGenre{}); err != nil {
 		// don't crash the whole server for migration issues while testing connectivity
 		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
@@ -61,6 +61,11 @@ func main() {
 	mangaSvc := svc.NewMangaService(mangaRepo)
 	mangaHandler := h.NewMangaHandler(mangaSvc)
 
+	// --- genres repo/service/handler ---
+	genreRepo := repo.NewGenreRepo(gdb)
+	genreSvc := svc.NewGenreService(genreRepo)
+	genreHandler := h.NewGenreHandler(genreSvc)
+
 	// Gin setup
 	r := gin.New()
 	r.Use(gin.Logger())
@@ -69,6 +74,7 @@ func main() {
 	// API routes
 	api := r.Group("/api")
 	mangaHandler.RegisterRoutes(api.Group("/manga"))
+	genreHandler.RegisterRoutes(api.Group("/genres"))
 
 	// Health/readiness
 	r.GET("/check-conn", func(c *gin.Context) {

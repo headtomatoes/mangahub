@@ -24,6 +24,11 @@ type MangaService interface {
 
 	// new search method
 	SearchByTitle(ctx context.Context, title string) ([]models.Manga, error)
+
+	// manga <-> genres (for handler endpoints)
+	GetGenresByManga(ctx context.Context, mangaID int64) ([]models.Genre, error)
+	AddGenresToManga(ctx context.Context, mangaID int64, genreIDs []int64) error
+	RemoveGenresFromManga(ctx context.Context, mangaID int64, genreIDs []int64) error
 }
 
 type mangaService struct {
@@ -114,6 +119,34 @@ func (s *mangaService) Delete(ctx context.Context, id int64) error {
 // SearchByTitle returns mangas that match title (case-insensitive, partial)
 func (s *mangaService) SearchByTitle(ctx context.Context, title string) ([]models.Manga, error) {
 	return s.repo.SearchByTitle(ctx, title)
+}
+
+func (s *mangaService) GetGenresByManga(ctx context.Context, mangaID int64) ([]models.Genre, error) {
+	return s.repo.GetGenresByManga(ctx, mangaID)
+}
+
+func (s *mangaService) AddGenresToManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
+	if len(genreIDs) == 0 {
+		return nil
+	}
+	for _, id := range genreIDs {
+		if id <= 0 {
+			return fmt.Errorf("invalid genre id: %d", id)
+		}
+	}
+	return s.repo.AddGenresToManga(ctx, mangaID, genreIDs)
+}
+
+func (s *mangaService) RemoveGenresFromManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
+	if len(genreIDs) == 0 {
+		return nil
+	}
+	for _, id := range genreIDs {
+		if id <= 0 {
+			return fmt.Errorf("invalid genre id: %d", id)
+		}
+	}
+	return s.repo.RemoveGenresFromManga(ctx, mangaID, genreIDs)
 }
 
 /* helper: generate slug-like string from title */
