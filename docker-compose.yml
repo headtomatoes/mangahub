@@ -1,31 +1,72 @@
 version: '3.8'
 
+
 services:
-  # HTTP API Server (Gin)
+# Database (PostgreSQL)
+  db:
+    image: postgres:15
+    container_name: mangahub_db
+    restart: always
+    environment:
+      POSTGRES_USER: mangahub
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: mangahub
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./database/data:/var/lib/postgresql/data
+    networks:
+      - mangahub-network
+
+# =========================
+  # 🚀 GO API SERVER
+  # =========================
   api-server:
     build:
-      context: .
       target: ${GO_ENV:-development}
     container_name: mangahub-api
+    restart: always
+    depends_on:
+      - db
+      - redis
     ports:
-      - "8080:8080"
-      - "2345:2345"  # Debugger port
+      - "8084:8084"
     volumes:
-      - .:/app
       - /app/tmp
-      - sqlite_data:/app/data
+      - .:/app
     environment:
-      - GO_ENV=${GO_ENV:-development}
-      - SERVICE_NAME=api-server
-      - HTTP_PORT=8080
-      - DATABASE_URL=/app/data/mangahub.db
-      - JWT_SECRET=${JWT_SECRET}
       - REDIS_URL=redis://redis:6379
+      - HTTP_PORT=8084
+      - DATABASE_URL=postgres://mangahub:${DB_PASS}@db:5432/mangahub?sslmode=disable
     command: ["air", "-c", ".air.api.toml"]
     networks:
       - mangahub-network
-    depends_on:
-      - redis
+  # HTTP API Server (Gin)
+  # api-server:
+  #   build:
+  #     context: .
+  #     target: ${GO_ENV:-development}
+  #   container_name: mangahub-api
+  #   ports:
+  #     - "8080:8080"
+  #     - "2345:2345"  # Debugger port
+  #   volumes:
+  #     - .:/app
+  #     - /app/tmp
+  #     - sqlite_data:/app/data
+  #   environment:
+  #     - GO_ENV=${GO_ENV:-development}
+  #     - SERVICE_NAME=api-server
+  #     - HTTP_PORT=8080
+  #     - DATABASE_URL=/app/data/mangahub.db
+  #     - JWT_SECRET=${JWT_SECRET}
+  #     - REDIS_URL=redis://redis:6379
+  #   command: ["air", "-c", ".air.api.toml"]
+  #   networks:
+  #     - mangahub-network
+  #   depends_on:
+  #     - redis
 
   # TCP Sync Server
   tcp-server:
