@@ -21,6 +21,9 @@ type MangaService interface {
 	Create(ctx context.Context, m *models.Manga) error
 	Update(ctx context.Context, id int64, m *models.Manga) error
 	Delete(ctx context.Context, id int64) error
+
+	// new search method
+	SearchByTitle(ctx context.Context, title string) ([]models.Manga, error)
 }
 
 type mangaService struct {
@@ -106,6 +109,11 @@ func (s *mangaService) Update(ctx context.Context, id int64, m *models.Manga) er
 func (s *mangaService) Delete(ctx context.Context, id int64) error {
 	// potential pre-delete checks (dependencies) could be here
 	return s.repo.Delete(ctx, id)
+}
+
+// SearchByTitle returns mangas that match title (case-insensitive, partial)
+func (s *mangaService) SearchByTitle(ctx context.Context, title string) ([]models.Manga, error) {
+	return s.repo.SearchByTitle(ctx, title)
 }
 
 /* helper: generate slug-like string from title */

@@ -15,8 +15,8 @@ DROP TABLE IF EXISTS manga CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 CREATE TABLE users (
-    id BIGSERIAL PRIMARY KEY,
-    uuid UUID DEFAULT gen_random_uuid(), -- keep uuid if needed
+    -- id BIGSERIAL PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- keep uuid if needed
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -120,3 +120,4 @@ CREATE TABLE ratings (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, manga_id)
 );
+

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"mangahub/internal/microservices/http-api/dto"
@@ -23,6 +24,7 @@ func NewMangaHandler(svc service.MangaService) *MangaHandler {
 
 func (h *MangaHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/", h.List)
+	rg.GET("/search", h.SearchByTitle) // new route (supports ?q= or ?title=)
 	rg.GET("/:id", h.Get)
 	rg.POST("/", h.Create)
 	rg.PUT("/:id", h.Update)
@@ -130,4 +132,31 @@ func (h *MangaHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *MangaHandler) SearchByTitle(c *gin.Context) {
+	// accept either ?q=... or ?title=... for compatibility
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		q = strings.TrimSpace(c.Query("title"))
+	}
+	if q == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "q or title query parameter is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	list, err := h.svc.SearchByTitle(ctx, q)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp := make([]dto.MangaResponse, 0, len(list))
+	for _, m := range list {
+		resp = append(resp, dto.FromModelToResponse(m))
+	}
+	c.JSON(http.StatusOK, resp)
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"mangahub/internal/microservices/http-api/models"
 
@@ -55,4 +56,35 @@ func (r *MangaRepo) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("delete manga: %w", err)
 	}
 	return nil
+}
+
+// SearchByTitle performs case-insensitive partial match on title, author and slug.
+// Splits query into tokens and requires each token to appear in at least one of the fields.
+// Example: "one piece oda" -> WHERE (title ILIKE '%one%' OR author ILIKE '%one%' OR slug ILIKE '%one%')
+//
+//	AND (title ILIKE '%piece%' OR author ILIKE '%piece%' OR slug ILIKE '%piece%') ...
+func (r *MangaRepo) SearchByTitle(ctx context.Context, title string) ([]models.Manga, error) {
+	var list []models.Manga
+	tokens := strings.Fields(title)
+	db := r.db.WithContext(ctx)
+
+	// if empty tokens, return empty list
+	if len(tokens) == 0 {
+		return list, nil
+	}
+
+	clauses := make([]string, 0, len(tokens))
+	args := make([]interface{}, 0, len(tokens)*3)
+	for _, t := range tokens {
+		p := "%" + t + "%"
+		// use COALESCE to avoid NULL author/slug causing ILIKE failure
+		clauses = append(clauses, "(title ILIKE ? OR COALESCE(author,'') ILIKE ? OR COALESCE(slug,'') ILIKE ?)")
+		args = append(args, p, p, p)
+	}
+
+	where := strings.Join(clauses, " AND ")
+	if err := db.Where(where, args...).Order("created_at desc").Find(&list).Error; err != nil {
+		return nil, fmt.Errorf("search manga by title/author: %w", err)
+	}
+	return list, nil
 }

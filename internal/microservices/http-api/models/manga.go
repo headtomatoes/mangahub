@@ -13,3 +13,7 @@ type Manga struct {
     CoverURL      *string    `json:"cover_url,omitempty"`
     CreatedAt     *time.Time `json:"created_at,omitempty" gorm:"autoCreateTime"`
 }
+
+func (Manga) TableName() string {
+    return "manga"
+}

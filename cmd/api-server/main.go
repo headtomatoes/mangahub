@@ -52,7 +52,8 @@ func main() {
 
 	// Auto-migrate manga model (safe for dev; careful in prod)
 	if err := gdb.AutoMigrate(&models.Manga{}); err != nil {
-		log.Fatalf("auto-migrate failed: %v", err)
+		// don't crash the whole server for migration issues while testing connectivity
+		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
 
 	// Wire repository, service, handler

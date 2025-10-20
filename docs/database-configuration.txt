@@ -42,3 +42,12 @@ curl -v http://localhost:8084/db-ping
 // after any changes in code: we need to rebuild and run docker again:
 docker compose build api-server
 docker compose up -d api-server
+
+
+# stop and remove the db service container
+docker compose stop db
+docker compose rm -f db
+
+# rebuild image and start db (detached)
+docker compose build db
+docker compose up -d db
