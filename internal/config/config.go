@@ -23,11 +23,15 @@ type Config struct {
 
 	// Database
 	DatabaseURL string `env:"DATABASE_URL" default:"/app/data/mangahub.db"`
-	SQLitePath  string `env:"SQLITE_PATH" default:"/app/data/mangahub.db"`
+	SQLitePath  string `env:"SQLITE_PATH" default:"/app/data/mangahub.db"` //(redundant now)
 
 	// Authentication
 	JWTSecret string        `env:"JWT_SECRET" required:"true"`
 	JWTExpiry time.Duration `env:"JWT_EXPIRY" default:"24h"`
+
+	// Token TTLs
+	AccessTokenTTL  time.Duration `env:"ACCESS_TOKEN_TTL" required:"true" default:"15m"`
+	RefreshTokenTTL time.Duration `env:"REFRESH_TOKEN_TTL" required:"true" default:"7day"`
 
 	// Redis Cache
 	RedisURL      string `env:"REDIS_URL" default:"redis://redis:6379"`
@@ -100,6 +104,15 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 	if err := loadEnvDuration(&config.JWTExpiry, "JWT_EXPIRY", 24*time.Hour); err != nil {
+		return nil, err
+	}
+
+	// Token TTLs
+	if err := loadEnvDuration(&config.AccessTokenTTL, "ACCESS_TOKEN_TTL", 15*time.Minute); err != nil {
+		return nil, err
+	}
+
+	if err := loadEnvDuration(&config.RefreshTokenTTL, "REFRESH_TOKEN_TTL", 7*24*time.Hour); err != nil {
 		return nil, err
 	}
 
@@ -278,7 +291,7 @@ func (c *Config) IsProduction() bool {
 	return c.GoEnv == "production"
 }
 
-// GetDatabasePath returns the appropriate database path
+// GetDatabasePath returns the appropriate database path(redundant now)
 func (c *Config) GetDatabasePath() string {
 	if c.DatabaseURL != "" {
 		return c.DatabaseURL
