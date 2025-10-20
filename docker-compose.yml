@@ -1,90 +1,92 @@
 version: '3.8'
 
-
 services:
-# Database (PostgreSQL)
+  # Database (PostgreSQL)
   db:
     image: postgres:15
     container_name: mangahub_db
     restart: always
     environment:
       POSTGRES_USER: mangahub
-      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_PASSWORD: ${DB_PASS:-mangahub_secret}
       POSTGRES_DB: mangahub
     ports:
       - "5432:5432"
     volumes:
-      - ./database/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/schema.sql
-      - ./database/data:/var/lib/postgresql/data
+      - ./database/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mangahub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - mangahub-network
 
-# =========================
-  # 🚀 GO API SERVER
-  # =========================
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: mangahub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - mangahub-network
+
+  # API Server (HTTP/REST)
   api-server:
     build:
+      context: .
       target: ${GO_ENV:-development}
     container_name: mangahub-api
     restart: always
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8084:8084"
     volumes:
-      - /app/tmp
       - .:/app
+      - /app/tmp
     environment:
-      - REDIS_URL=redis://redis:6379
+      - GO_ENV=${GO_ENV:-development}
+      - SERVICE_NAME=api-server
       - HTTP_PORT=8084
-      - DATABASE_URL=postgres://mangahub:${DB_PASS}@db:5432/mangahub?sslmode=disable
+      - DATABASE_URL=postgres://mangahub:${DB_PASS:-mangahub_secret}@db:5432/mangahub?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-change-in-production}
     command: ["air", "-c", ".air.api.toml"]
     networks:
       - mangahub-network
-  # HTTP API Server (Gin)
-  # api-server:
-  #   build:
-  #     context: .
-  #     target: ${GO_ENV:-development}
-  #   container_name: mangahub-api
-  #   ports:
-  #     - "8080:8080"
-  #     - "2345:2345"  # Debugger port
-  #   volumes:
-  #     - .:/app
-  #     - /app/tmp
-  #     - sqlite_data:/app/data
-  #   environment:
-  #     - GO_ENV=${GO_ENV:-development}
-  #     - SERVICE_NAME=api-server
-  #     - HTTP_PORT=8080
-  #     - DATABASE_URL=/app/data/mangahub.db
-  #     - JWT_SECRET=${JWT_SECRET}
-  #     - REDIS_URL=redis://redis:6379
-  #   command: ["air", "-c", ".air.api.toml"]
-  #   networks:
-  #     - mangahub-network
-  #   depends_on:
-  #     - redis
 
   # TCP Sync Server
   tcp-server:
     build:
       context: .
-      target: ${GO_ENV:-development}  
+      target: ${GO_ENV:-development}
     container_name: mangahub-tcp
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8081:8081"
     volumes:
       - .:/app
       - /app/tmp
-      - sqlite_data:/app/data
     environment:
       - GO_ENV=${GO_ENV:-development}
       - SERVICE_NAME=tcp-server
       - TCP_PORT=8081
-      - DATABASE_URL=/app/data/mangahub.db
+      - DATABASE_URL=postgres://mangahub:${DB_PASS:-mangahub_secret}@db:5432/mangahub?sslmode=disable
     command: ["air", "-c", ".air.tcp.toml"]
     networks:
       - mangahub-network
@@ -95,17 +97,20 @@ services:
       context: .
       target: ${GO_ENV:-development}
     container_name: mangahub-udp
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8082:8082/udp"
     volumes:
       - .:/app
       - /app/tmp
-      - sqlite_data:/app/data
     environment:
       - GO_ENV=${GO_ENV:-development}
       - SERVICE_NAME=udp-server
       - UDP_PORT=8082
-      - DATABASE_URL=/app/data/mangahub.db
+      - DATABASE_URL=postgres://mangahub:${DB_PASS:-mangahub_secret}@db:5432/mangahub?sslmode=disable
     command: ["air", "-c", ".air.udp.toml"]
     networks:
       - mangahub-network
@@ -116,29 +121,21 @@ services:
       context: .
       target: ${GO_ENV:-development}
     container_name: mangahub-grpc
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8083:8083"
     volumes:
       - .:/app
       - /app/tmp
-      - sqlite_data:/app/data
     environment:
       - GO_ENV=${GO_ENV:-development}
       - SERVICE_NAME=grpc-server
       - GRPC_PORT=8083
-      - DATABASE_URL=/app/data/mangahub.db
+      - DATABASE_URL=postgres://mangahub:${DB_PASS:-mangahub_secret}@db:5432/mangahub?sslmode=disable
     command: ["air", "-c", ".air.grpc.toml"]
-    networks:
-      - mangahub-network
-
-  # Redis Cache (Optional bonus feature)
-  redis:
-    image: redis:7-alpine
-    container_name: mangahub-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
     networks:
       - mangahub-network
 
@@ -172,7 +169,7 @@ services:
       - monitoring
 
 volumes:
-  sqlite_data:
+  postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:

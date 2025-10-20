@@ -4,31 +4,69 @@
 *.dll
 *.so
 *.dylib
+cmd/api-server/api-server
+cmd/grpc-server/grpc-server
+cmd/tcp-server/tcp-server
+cmd/udp-server/udp-server
 
-# Test binary, built with "go test -c"
+# Test binary, built with `go test -c`
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Output of the go coverage tool
 *.out
+coverage.html
+coverage.txt
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+vendor/
 
 # Go workspace file
 go.work
-tmp/
 
-# IDE specific files
-.vscode
-.idea
-
-# .env file
+# Environment files
 .env
+.env.local
+.env.*.local
 
-# Project build
-main
-*templ.go
-
-# OS X generated file
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .DS_Store
 
+# Air tmp directory
+tmp/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+database/data/*.db
+
+# Logs
+*.log
+logs/
+database/migrations/*.log
+
+# Raw data (if large)
+raw-data/manga/*.json
+raw-data/manga/*.csv
+
+# Docker volumes
+docker-data/
+
+# Build artifacts
+bin/
+dist/
+build/
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
