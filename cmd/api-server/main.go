@@ -17,6 +17,7 @@ import (
 	// gormdb "mangahub/internal/db" // removed — use database.OpenGorm()
 	"mangahub/internal/config"
 	h "mangahub/internal/microservices/http-api/handler"
+	mid "mangahub/internal/microservices/http-api/middleware"
 	"mangahub/internal/microservices/http-api/models"
 	repo "mangahub/internal/microservices/http-api/repository"
 	svc "mangahub/internal/microservices/http-api/service"
@@ -66,13 +67,27 @@ func main() {
 	genreSvc := svc.NewGenreService(genreRepo)
 	genreHandler := h.NewGenreHandler(genreSvc)
 
+	// --- auth and user setup ---
+	userRepo := repo.NewUserRepository(gdb)
+	refreshToken := repo.NewRefreshTokenRepository(gdb)
+	authSvc := svc.NewAuthService(userRepo, refreshToken, cfg)
+	authHandler := h.NewAuthHandler(authSvc)
+
 	// Gin setup
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	// API routes
+	// Public routes (no auth required)
+	auth := r.Group("/auth")
+	{
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/refresh", authHandler.RefreshToken)
+	}
+	// Protect routes with auth middleware
 	api := r.Group("/api")
+	api.Use(mid.AuthMiddleware(authSvc))
 	mangaHandler.RegisterRoutes(api.Group("/manga"))
 	genreHandler.RegisterRoutes(api.Group("/genres"))
 
