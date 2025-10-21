@@ -60,6 +60,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+// TODO: what is the best practice for refresh token response structure?
+// like when the AT is timed out, do we issue a new RT as well or just a new AT?
+// for now, we just issue a new AT
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req dto.RefreshTokenRequest
 
