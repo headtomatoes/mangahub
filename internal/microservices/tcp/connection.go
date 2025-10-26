@@ -49,7 +49,15 @@ func (c *ClientConnection) Listen() {
 		case "progress_update":
 			c.HandleProgressMessage(msg.Data)
 		default:
-			fmt.Printf("Unknown message type from client %s: %s\n", c.ID, msg.Type)
+			// Broadcast any valid JSON message (for flexibility and testing)
+			fmt.Printf("Broadcasting message type '%s' from client %s\n", msg.Type, c.ID)
+			payload, _ := json.Marshal(map[string]interface{}{
+				"type":      msg.Type,
+				"data":      msg.Data,
+				"timestamp": time.Now().Unix(),
+				"client_id": c.ID,
+			})
+			c.Manager.Broadcast(payload)
 		}
 	}
 }
