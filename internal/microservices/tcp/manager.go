@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 )
 
@@ -10,13 +11,15 @@ type ConnectionManager struct {
 	// map store all active client connections
 	// key: client ID, value: ClientConnection pointer
 	// use pointer for efficient access and modification
-	mu sync.RWMutex // read-write mutex for concurrent access
+	mu     sync.RWMutex // read-write mutex for concurrent access
+	logger *slog.Logger // pointer to structured logger for logging events
 }
 
 // constructor for ConnectionManager
 func NewConnectionManager() *ConnectionManager {
 	return &ConnectionManager{ // return a pointer to a new ConnectionManager to share across goroutines
 		clients: make(map[string]*ClientConnection), // initialize empty map
+		logger:  slog.Default(),                     // Initialize with default logger which can be customized later
 	}
 }
 
@@ -25,7 +28,9 @@ func (m *ConnectionManager) AddConnection(client *ClientConnection) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.clients[client.ID] = client // add the new client connection to the map by its ID
-	fmt.Printf("Client %s connected!\n", client.ID)
+	m.logger.Info("client_added",
+		"client_id", client.ID,
+	)
 }
 
 // method to remove a connection
@@ -33,7 +38,9 @@ func (m *ConnectionManager) RemoveConnection(client *ClientConnection) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.clients, client.ID) // remove the client connection from the map by its ID
-	fmt.Printf("Client %s disconnected!\n", client.ID)
+	m.logger.Info("client_removed",
+		"client_id", client.ID,
+	)
 }
 
 // method to close all connections
@@ -42,7 +49,9 @@ func (m *ConnectionManager) CloseAllConnections() {
 	defer m.mu.Unlock()
 	for id, client := range m.clients { // iterate over all connectedclients
 		client.Close()
-		fmt.Printf("Closed connection to client %s\n", id)
+		m.logger.Info("client_connection_closed",
+			"client_id", id,
+		)
 	}
 	m.clients = make(map[string]*ClientConnection)
 	// reset the map,for clearing all references
@@ -59,7 +68,12 @@ func (m *ConnectionManager) Broadcast(msg []byte) {
 	m.mu.RLock() // use read lock because we are only reading from the map, by that
 	// allowing multiple concurrent broadcasts
 	defer m.mu.RUnlock()
-	for _, c := range m.clients {
-		c.Send(msg)
+	for id, c := range m.clients {
+		if err := c.Send(msg); err != nil {
+			m.logger.Warn("failed_to_send_broadcast",
+				"client_id", id,
+				"error", err.Error(),
+			)
+		}
 	}
 }

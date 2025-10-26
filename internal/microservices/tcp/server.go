@@ -2,6 +2,7 @@ package tcp
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 // server entry point would go here
 
 // server struct and methods
+// when using pointers we need to define explicitly in the constructor, avoid nil pointer dereference
 type TCPServer struct {
 	Addr string
 	// server address
@@ -22,14 +24,21 @@ type TCPServer struct {
 	// when closed, all goroutines listening for this channel will initiate shutdown
 	wg sync.WaitGroup
 	// wait group for collection of goroutines to finish
+	logger *slog.Logger
+	// structured logger for logging server events
 }
 
 // constructor for Server
 func NewServer(addr string) *TCPServer {
+	logger := slog.Default()          // Use default logger for now, can be customized later
+	manager := NewConnectionManager() // create new connection manager
+	manager.logger = logger           // then we can set the logger of the manager struct to use the same logger
+
 	return &TCPServer{
 		Addr:     addr,
-		Manager:  NewConnectionManager(),
+		Manager:  manager,
 		quitChan: make(chan struct{}),
+		logger:   logger,
 	}
 }
 
@@ -38,16 +47,24 @@ func (s *TCPServer) Start() error {
 	// listen for incoming connections
 	listener, err := net.Listen("tcp", s.Addr)
 	if err != nil {
+		s.logger.Error(
+			"failed_to_start_server",
+			"error", err.Error(),
+		)
 		return fmt.Errorf("failed to start TCP server, error: %v", err)
 	}
 	defer listener.Close()
-	fmt.Printf("TCP server started on %s\n", s.Addr)
-
+	s.logger.Info("server_started",
+		"addr", s.Addr,
+	)
 	// accept connections in a loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Printf("failed to accept connection, error: %v\n", err)
+			s.logger.Error(
+				"failed_to_accept_connection",
+				"error", err.Error(),
+			)
 			continue
 		}
 		// add +1 to wait group for the new connection handler goroutine
@@ -65,10 +82,15 @@ func (s *TCPServer) Start() error {
 
 // handle connections/lifecycle of single client connection
 func (s *TCPServer) handleConnection(conn net.Conn) {
-	client := NewClientConnection(conn, s.Manager) // create new client connection that wrap around manager
-	s.Manager.AddConnection(client)                // register connection with manager
-	client.Listen()                                // start listening for messages from client
-	s.Manager.RemoveConnection(client)             // unregister connection on exit
+	client := NewClientConnection(conn, s.Manager) // create new client connection that wrap around manager//
+	// auth process prototype maybe use the http api auth 1st the proceed to tcp
+	// if !s.authenticateClient(client) {
+	// 	conn.Close()
+	// 	return
+	// }
+	s.Manager.AddConnection(client)    // register connection with manager
+	client.Listen()                    // start listening for messages from client
+	s.Manager.RemoveConnection(client) // unregister connection when Listen exits
 }
 
 // stop the server
@@ -79,3 +101,10 @@ func (s *TCPServer) Stop() {
 	s.Manager.CloseAllConnections()                                           // close all active connections
 	s.wg.Wait()                                                               // wait for all goroutines to finish
 }
+
+// authenticate client prototype
+// func (s *TCPServer) authenticateClient(c *ClientConnection) bool {
+// 	// placeholder for authentication logic
+// 	// e.g., read initial auth message, validate credentials, etc.
+// 	return true // assume always successful for prototype
+// }
