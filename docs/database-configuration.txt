@@ -51,3 +51,6 @@ docker compose rm -f db
 # rebuild image and start db (detached)
 docker compose build db
 docker compose up -d db
+
+
+docker-compose restart api-server
