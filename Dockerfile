@@ -1,88 +1,98 @@
-# Multi-stage Dockerfile for multiple Go services
+# syntax=docker/dockerfile:1
 
-# Base stage with all necessary tools for building and development
+# ============================================
+# Stage 1: Base builder with dependencies
+# ============================================
 FROM golang:1.25-alpine AS base
-# Install system packages
-RUN apk add --no-cache git sqlite-dev build-base protobuf-dev
-# Install Go-based protobuf tools
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# Install build dependencies
+RUN apk add --no-cache git make protobuf protobuf-dev gcc musl-dev
+
 WORKDIR /app
 
-# Development stage with live reload
-FROM base AS development
-# Install Air for hot reloading
-RUN go install github.com/air-verse/air@latest
-# Install Delve for debugging
-RUN go install github.com/go-delve/delve/cmd/dlv@latest
-# Install protobuf compiler for gRPC
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
-# Copy dependency files first for better layer caching
+# Copy go mod files
 COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy proto files and generate gRPC code
-COPY proto/ ./proto/
-RUN protoc --go_out=. --go-grpc_out=. proto/*.proto
-
-# Expose ports for all services
-EXPOSE 8080 8081 8082 8083 2345
-
-# Default development command (can be overridden)
-CMD ["air", "-c", ".air.toml"]
-
-# Builder stage - builds all binaries
-FROM base AS builder
-COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
 # Copy source code
 COPY . .
 
-# Generate protobuf files
-RUN protoc --go_out=. --go-grpc_out=. proto/*.proto
+# ============================================
+# Stage 2: Development (with Air)
+# ============================================
+FROM base AS development
 
-# Build all binaries with CGO enabled for SQLite
-ENV CGO_ENABLED=1
-RUN go build -ldflags="-s -w" -o bin/api-server ./cmd/api-server
-RUN go build -ldflags="-s -w" -o bin/tcp-server ./cmd/tcp-server  
-RUN go build -ldflags="-s -w" -o bin/udp-server ./cmd/udp-server
-RUN go build -ldflags="-s -w" -o bin/grpc-server ./cmd/grpc-server
+# Install Air for hot reload
+RUN go install github.com/air-verse/air@latest
 
-# Production stage for API server
-FROM alpine:latest AS api-production
-RUN apk --no-cache add ca-certificates sqlite
-WORKDIR /app
-COPY --from=builder /app/bin/api-server ./
-COPY --from=builder /app/data/ ./data/
-EXPOSE 8080
+# Expose all service ports
+EXPOSE 8081 8082 8083 8084
+
+# Default command (overridden in docker-compose)
+CMD ["air", "-c", ".air.api.toml"]
+
+# ============================================
+# Stage 3: Build API Server
+# ============================================
+FROM base AS build-api
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/api-server ./cmd/api-server
+
+# ============================================
+# Stage 4: Build TCP Server
+# ============================================
+FROM base AS build-tcp
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/tcp-server ./cmd/tcp-server
+
+# ============================================
+# Stage 5: Build UDP Server
+# ============================================
+FROM base AS build-udp
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/udp-server ./cmd/udp-server
+
+# ============================================
+# Stage 6: Build gRPC Server
+# ============================================
+FROM base AS build-grpc
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/grpc-server ./cmd/grpc-server
+
+# ============================================
+# Stage 7: Test stage
+# ============================================
+FROM base AS test
+RUN go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+# ============================================
+# Final Stages: Production Runtime (minimal)
+# ============================================
+
+# API Server runtime
+FROM alpine:latest AS production-api
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /root/
+COPY --from=build-api /bin/api-server .
+EXPOSE 8084
 CMD ["./api-server"]
 
-# Production stage for TCP server
-FROM alpine:latest AS tcp-production
-RUN apk --no-cache add ca-certificates sqlite
-WORKDIR /app
-COPY --from=builder /app/bin/tcp-server ./
-COPY --from=builder /app/data/ ./data/
+# TCP Server runtime
+FROM alpine:latest AS production-tcp
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /root/
+COPY --from=build-tcp /bin/tcp-server .
 EXPOSE 8081
 CMD ["./tcp-server"]
 
-# Production stage for UDP server
-FROM alpine:latest AS udp-production
-RUN apk --no-cache add ca-certificates sqlite
-WORKDIR /app
-COPY --from=builder /app/bin/udp-server ./
-COPY --from=builder /app/data/ ./data/
+# UDP Server runtime
+FROM alpine:latest AS production-udp
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /root/
+COPY --from=build-udp /bin/udp-server .
 EXPOSE 8082
 CMD ["./udp-server"]
 
-# Production stage for gRPC server
-FROM alpine:latest AS grpc-production
-RUN apk --no-cache add ca-certificates sqlite
-WORKDIR /app
-COPY --from=builder /app/bin/grpc-server ./
-COPY --from=builder /app/data/ ./data/
+# gRPC Server runtime
+FROM alpine:latest AS production-grpc
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /root/
+COPY --from=build-grpc /bin/grpc-server .
 EXPOSE 8083
 CMD ["./grpc-server"]
