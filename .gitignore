@@ -70,3 +70,5 @@ docs/.doctrees/
 *.tmp
 *.bak
 *.cache
+# remove tracked files in the directory from the index, keep them locally
+database/data/
