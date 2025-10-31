@@ -15,32 +15,3 @@ docker exec -it mangahub_db psql -U mangahub -d mangahub -c "TRUNCATE TABLE mang
 # copy/execute migration file into container via stdin
 docker exec -i mangahub_db psql -U mangahub -d mangahub < database/migrations/001_init.up.sql
 docker exec -i mangahub_db psql -U mangahub -d mangahub < database/migrations/002_seed_data.sql
-
-
-Library & Progress Management
-
- Create UserLibrary model (user_id, manga_id, added_at)
-
- Create UserProgress model (user_id, manga_id, chapter, page, updated_at)
-
- Implement LibraryRepository and ProgressRepository
-
- Implement LibraryService (add, remove, list)
-
- Implement ProgressService (update, get)
-
- Create DTOs for library and progress
-
-Pair Programming:
-
- Create LibraryHandler and ProgressHandler
-
- Add middleware to extract user_id from JWT
-GET /api/manga                    # List all manga (paginated)
-GET /api/manga/search?q=one+piece # Search manga
-GET /api/manga/:id                # Get manga details
-POST   /api/library              # Add manga to library
-GET    /api/library              # Get user's library
-DELETE /api/library/:manga_id    # Remove from library
-PUT    /api/progress/:manga_id   # Update reading progress
-GET    /api/progress/:manga_id   # Get progress for manga

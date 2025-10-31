@@ -15,6 +15,9 @@ DROP TABLE IF EXISTS genres CASCADE;
 DROP TABLE IF EXISTS manga CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
+DROP TABLE IF EXISTS user_library CASCADE;
+
+
 -- ========================================
 -- USERS
 -- ========================================
