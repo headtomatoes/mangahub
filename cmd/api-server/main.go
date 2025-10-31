@@ -51,9 +51,16 @@ func main() {
 		log.Fatalf("failed to open gorm DB: %v", err)
 	}
 
-	// Auto-migrate manga model (safe for dev; careful in prod)
-	if err := gdb.AutoMigrate(&models.Manga{}, &models.Genre{}, &models.MangaGenre{}); err != nil {
-		// don't crash the whole server for migration issues while testing connectivity
+	// Auto-migrate models
+	if err := gdb.AutoMigrate(
+		&models.Manga{},
+		&models.Genre{},
+		&models.MangaGenre{},
+		&models.User{},
+		&models.RefreshToken{},
+		&models.UserLibrary{},
+		&models.UserProgress{},
+	); err != nil {
 		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
 
@@ -62,34 +69,49 @@ func main() {
 	mangaSvc := svc.NewMangaService(mangaRepo)
 	mangaHandler := h.NewMangaHandler(mangaSvc)
 
-	// --- genres repo/service/handler ---
+	// genres repo/service/handler
 	genreRepo := repo.NewGenreRepo(gdb)
 	genreSvc := svc.NewGenreService(genreRepo)
 	genreHandler := h.NewGenreHandler(genreSvc)
 
-	// --- auth and user setup ---
+	// auth and user setup
 	userRepo := repo.NewUserRepository(gdb)
 	refreshToken := repo.NewRefreshTokenRepository(gdb)
 	authSvc := svc.NewAuthService(userRepo, refreshToken, cfg)
 	authHandler := h.NewAuthHandler(authSvc)
+
+	// library setup
+	libraryRepo := repo.NewLibraryRepository(gdb)
+	librarySvc := svc.NewLibraryService(libraryRepo, mangaRepo)
+	libraryHandler := h.NewLibraryHandler(librarySvc)
+
+	// progress setup
+	progressRepo := repo.NewProgressRepository(gdb)
+	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
+	progressHandler := h.NewProgressHandler(progressSvc)
 
 	// Gin setup
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	// Public routes (no auth required)
+	// Public routes
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/refresh", authHandler.RefreshToken)
 	}
-	// Protect routes with auth middleware
+
+	// Protected routes
 	api := r.Group("/api")
 	api.Use(mid.AuthMiddleware(authSvc))
-	mangaHandler.RegisterRoutes(api.Group("/manga"))
-	genreHandler.RegisterRoutes(api.Group("/genres"))
+	{
+		mangaHandler.RegisterRoutes(api.Group("/manga"))
+		genreHandler.RegisterRoutes(api.Group("/genres"))
+		libraryHandler.RegisterRoutes(api.Group("/library"))
+		progressHandler.RegisterRoutes(api.Group("/progress"))
+	}
 
 	// Health/readiness
 	r.GET("/check-conn", func(c *gin.Context) {
