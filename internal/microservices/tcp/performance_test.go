@@ -28,7 +28,9 @@ func (s *TCPServerTestSuite) SetupTest() {
 	// Use different port for each test to avoid conflicts
 	s.serverPort = 8081 + int(time.Now().UnixNano()%1000) // 8081 + random offset
 	s.serverAddr = fmt.Sprintf("localhost:%d", s.serverPort)
-	s.server = NewServer(s.serverAddr) // each port gets a fresh server instance
+
+	// Use mock Redis for testing (no actual Redis connection required)
+	s.server = NewServerWithMockRedis(s.serverAddr)
 
 	go s.server.Start() // start each server in a goroutine
 
@@ -769,7 +771,7 @@ func TestConnectionRefused(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkMessageThroughput(b *testing.B) {
-	server := NewServer("localhost:8090")
+	server := NewServer("localhost:8090", "localhost:6379")
 	go server.Start()
 	time.Sleep(100 * time.Millisecond)
 	defer server.Stop()

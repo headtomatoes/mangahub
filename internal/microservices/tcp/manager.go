@@ -11,15 +11,17 @@ type ConnectionManager struct {
 	// map store all active client connections
 	// key: client ID, value: ClientConnection pointer
 	// use pointer for efficient access and modification
-	mu     sync.RWMutex // read-write mutex for concurrent access
-	logger *slog.Logger // pointer to structured logger for logging events
+	mu           sync.RWMutex        // read-write mutex for concurrent access
+	logger       *slog.Logger        // pointer to structured logger for logging events
+	progressRepo *ProgressRepository // pointer to progress repository for saving progress data
 }
 
 // constructor for ConnectionManager
-func NewConnectionManager() *ConnectionManager {
+func NewConnectionManager(progressRepo *ProgressRepository) *ConnectionManager {
 	return &ConnectionManager{ // return a pointer to a new ConnectionManager to share across goroutines
-		clients: make(map[string]*ClientConnection), // initialize empty map
-		logger:  slog.Default(),                     // Initialize with default logger which can be customized later
+		clients:      make(map[string]*ClientConnection), // initialize empty map
+		logger:       slog.Default(),                     // Initialize with default logger which can be customized later
+		progressRepo: progressRepo,                       // Set the progress repository
 	}
 }
 

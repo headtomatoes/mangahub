@@ -132,7 +132,7 @@ func (c *ClientConnection) Listen() {
 				"message_type", msg.Type,
 				"client_id", c.ID,
 			)
-			payload, err := json.Marshal(map[string]interface{}{
+			payload, err := json.Marshal(map[string]any{
 				"type":      msg.Type,
 				"data":      msg.Data,
 				"timestamp": time.Now().Unix(),
@@ -152,19 +152,34 @@ func (c *ClientConnection) Listen() {
 
 // method to handle incoming messages in this case is the
 // progress messages
-func (c *ClientConnection) HandleProgressMessage(data map[string]interface{}) {
-	payload, err := json.Marshal(map[string]interface{}{ // construct broadcast message payload
+func (c *ClientConnection) HandleProgressMessage(data map[string]any) {
+	// Extract data
+	userID, _ := data["user_id"].(string)
+	mangaID, _ := data["manga_id"].(string)
+	chapter, _ := data["chapter"].(float64) // JSON numbers are float64
+
+	// Save to Redis (skip if progressRepo client is nil - testing mode)
+	if c.Manager.progressRepo != nil && c.Manager.progressRepo.client != nil {
+		progressData := &ProgressData{
+			UserID:     userID,
+			MangaID:    mangaID,
+			Chapter:    int(chapter),
+			LastReadAt: time.Now(),
+			Status:     "reading",
+		}
+
+		if err := c.Manager.progressRepo.SaveProgress(progressData); err != nil {
+			fmt.Printf("Error saving progress: %v\n", err)
+			return
+		}
+	}
+
+	// Broadcast to other clients
+	payload, _ := json.Marshal(map[string]interface{}{
 		"type":      "progress_broadcast",
 		"data":      data,
 		"timestamp": time.Now().Unix(),
 	})
-	if err != nil {
-		c.Manager.logger.Error("failed_to_marshal_progress_message",
-			"client_id", c.ID,
-			"error", err.Error(),
-		)
-		return
-	}
 	c.Manager.Broadcast(payload)
 }
 

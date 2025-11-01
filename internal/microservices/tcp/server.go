@@ -29,13 +29,36 @@ type TCPServer struct {
 }
 
 // constructor for Server
-func NewServer(addr string) *TCPServer {
-	logger := slog.Default()          // Use default logger for now, can be customized later
-	manager := NewConnectionManager() // create new connection manager
-	manager.logger = logger           // then we can set the logger of the manager struct to use the same logger
+func NewServer(addrTCP, addrRedis string) *TCPServer {
+	logger := slog.Default()                              // Use default logger for now, can be customized later
+	progressRepo, err := NewProgressRepository(addrRedis) // create new progress repository
+	if err != nil {
+		logger.Error("failed_to_create_progress_repository", "error", err.Error())
+		return nil
+	}
+	manager := NewConnectionManager(progressRepo) // create new connection manager
+	manager.logger = logger                       // then we can set the logger of the manager struct to use the same logger
 
 	return &TCPServer{
-		Addr:     addr,
+		Addr:     addrTCP,
+		Manager:  manager,
+		quitChan: make(chan struct{}),
+		logger:   logger,
+	}
+}
+
+// NewServerWithMockRedis creates a server without Redis for testing
+func NewServerWithMockRedis(addrTCP string) *TCPServer {
+	logger := slog.Default()
+	progressRepo := &ProgressRepository{
+		client: nil, // nil client for testing - won't be used
+		ctx:    nil,
+	}
+	manager := NewConnectionManager(progressRepo)
+	manager.logger = logger
+
+	return &TCPServer{
+		Addr:     addrTCP,
 		Manager:  manager,
 		quitChan: make(chan struct{}),
 		logger:   logger,
@@ -100,6 +123,12 @@ func (s *TCPServer) Stop() {
 	time.Sleep(5 * time.Second)                                               // wait for a moment to allow clients to process the shutdown message
 	s.Manager.CloseAllConnections()                                           // close all active connections
 	s.wg.Wait()                                                               // wait for all goroutines to finish
+	// Close Redis connection if it exists
+	if s.Manager.progressRepo != nil && s.Manager.progressRepo.client != nil {
+		if err := s.Manager.progressRepo.Close(); err != nil {
+			s.logger.Error("failed_to_close_redis", "error", err.Error())
+		}
+	}
 }
 
 // authenticate client prototype
