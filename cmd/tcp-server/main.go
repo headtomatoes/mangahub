@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"log/slog"
@@ -10,6 +12,9 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
 )
 
 func main() {
@@ -39,8 +44,43 @@ func main() {
 		"redis_addr", redisAddr,
 	)
 
-	// Create and start TCP server
-	server := tcp.NewServer(tcpAddr, redisAddr)
+	// Connect to PostgreSQL for hybrid storage
+	dbURL := os.Getenv("DATABASE_URL")
+	var server *tcp.TCPServer
+
+	if dbURL != "" && dbURL != "none" {
+		// Create hybrid server with PostgreSQL + Redis
+		logger.Info("initializing_hybrid_storage", "database_url", "***")
+
+		db, err := sql.Open("pgx", dbURL) // Use pgx driver
+		if err != nil {
+			log.Fatalf("Failed to open database connection: %v", err)
+		}
+		defer db.Close()
+
+		// Test database connection
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := db.PingContext(ctx); err != nil {
+			cancel()
+			log.Fatalf("Failed to ping database: %v", err)
+		}
+		cancel()
+
+		// Configure connection pool
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(1 * time.Hour)
+
+		logger.Info("database_connected", "max_open_conns", 25)
+
+		// Create server with hybrid storage and authentication
+		server = tcp.NewServerWithHybridStorage(tcpAddr, redisAddr, db, cfg.JWTSecret)
+	} else {
+		// Fallback to Redis-only mode
+		logger.Warn("database_url_not_set", "storage_mode", "redis_only")
+		server = tcp.NewServer(tcpAddr, redisAddr)
+	}
+
 	if server == nil {
 		log.Fatal("Failed to create TCP server")
 	}

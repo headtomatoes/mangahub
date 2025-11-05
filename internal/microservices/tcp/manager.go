@@ -6,18 +6,26 @@ import (
 	"sync"
 )
 
+// ProgressRepository interface for abstraction (supports both Redis-only and Hybrid)
+type ProgressRepository interface {
+	SaveProgress(data *ProgressData) error
+	GetProgress(userID string, mangaID int64) (*ProgressData, error)
+	GetUserProgress(userID string) ([]*ProgressData, error)
+	DeleteProgress(userID string, mangaID int64) error
+}
+
 type ConnectionManager struct {
 	clients map[string]*ClientConnection
 	// map store all active client connections
 	// key: client ID, value: ClientConnection pointer
 	// use pointer for efficient access and modification
-	mu           sync.RWMutex        // read-write mutex for concurrent access
-	logger       *slog.Logger        // pointer to structured logger for logging events
-	progressRepo *ProgressRepository // pointer to progress repository for saving progress data
+	mu           sync.RWMutex       // read-write mutex for concurrent access
+	logger       *slog.Logger       // pointer to structured logger for logging events
+	progressRepo ProgressRepository // pointer to progress repository (can be Redis or Hybrid)
 }
 
 // constructor for ConnectionManager
-func NewConnectionManager(progressRepo *ProgressRepository) *ConnectionManager {
+func NewConnectionManager(progressRepo ProgressRepository) *ConnectionManager {
 	return &ConnectionManager{ // return a pointer to a new ConnectionManager to share across goroutines
 		clients:      make(map[string]*ClientConnection), // initialize empty map
 		logger:       slog.Default(),                     // Initialize with default logger which can be customized later

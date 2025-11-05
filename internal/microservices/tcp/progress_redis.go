@@ -3,27 +3,27 @@ package tcp
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type ProgressData struct {
-	UserID  string `json:"user_id"`
-	MangaID string `json:"manga_id"`
-	Chapter int    `json:"chapter"`
-	//Page       int       `json:"page"` // current page not used but can be useful for tracking
+	UserID     string    `json:"user_id"`
+	MangaID    int64     `json:"manga_id"` // Changed from string to int64 for consistency
+	Chapter    int64     `json:"chapter"`  // Changed from int to int64
 	LastReadAt time.Time `json:"last_read_at"`
 	Status     string    `json:"status"` // "reading", "completed", "on_hold"
 }
 
-type ProgressRepository struct {
+type ProgressRedisRepo struct {
 	client *redis.Client   // Redis client instance
 	ctx    context.Context // Context for managing request lifecycle
 }
 
-// constructor for ProgressRepository
-func NewProgressRepository(redisAddr string) (*ProgressRepository, error) {
+// constructor for ProgressRedisRepo
+func NewProgressRedisRepo(redisAddr string) (*ProgressRedisRepo, error) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         redisAddr,
 		Password:     "",
@@ -41,17 +41,17 @@ func NewProgressRepository(redisAddr string) (*ProgressRepository, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	return &ProgressRepository{
+	return &ProgressRedisRepo{
 		client: rdb,
 		ctx:    context.Background(),
 	}, nil
 }
 
 // Save progress (upsert)
-func (r *ProgressRepository) SaveProgress(data *ProgressData) error {
-	key := fmt.Sprintf("progress:user:%s:manga:%s", data.UserID, data.MangaID)
+func (r *ProgressRedisRepo) SaveProgress(data *ProgressData) error {
+	key := fmt.Sprintf("progress:user:%s:manga:%d", data.UserID, data.MangaID)
 
-	// Convert struct to a map[string]interface{} for HSET
+	// Convert struct to a map[string]any for HSET
 	fields := map[string]any{
 		"user_id":  data.UserID,
 		"manga_id": data.MangaID,
@@ -71,8 +71,8 @@ func (r *ProgressRepository) SaveProgress(data *ProgressData) error {
 }
 
 // Get progress
-func (r *ProgressRepository) GetProgress(userID, mangaID string) (*ProgressData, error) {
-	key := fmt.Sprintf("progress:user:%s:manga:%s", userID, mangaID)
+func (r *ProgressRedisRepo) GetProgress(userID string, mangaID int64) (*ProgressData, error) {
+	key := fmt.Sprintf("progress:user:%s:manga:%d", userID, mangaID)
 
 	// Use HGetAll to retrieve all fields from hash
 	fields, err := r.client.HGetAll(r.ctx, key).Result()
@@ -86,11 +86,11 @@ func (r *ProgressRepository) GetProgress(userID, mangaID string) (*ProgressData,
 	// Parse fields into struct
 	data := &ProgressData{
 		UserID:  fields["user_id"],
-		MangaID: fields["manga_id"],
+		MangaID: mangaID,
 		Status:  fields["status"],
 	}
 
-	// Parse chapter as int
+	// Parse chapter as int64
 	if ch, ok := fields["chapter"]; ok {
 		fmt.Sscanf(ch, "%d", &data.Chapter)
 	}
@@ -104,7 +104,7 @@ func (r *ProgressRepository) GetProgress(userID, mangaID string) (*ProgressData,
 }
 
 // Get all manga progress for a user
-func (r *ProgressRepository) GetUserProgress(userID string) ([]*ProgressData, error) {
+func (r *ProgressRedisRepo) GetUserProgress(userID string) ([]*ProgressData, error) {
 	pattern := fmt.Sprintf("progress:user:%s:manga:*", userID)
 	var results []*ProgressData
 	var cursor uint64
@@ -123,14 +123,19 @@ func (r *ProgressRepository) GetUserProgress(userID string) ([]*ProgressData, er
 				continue
 			}
 			// Parse fields into ProgressData...
+			mangaID, err := strconv.ParseInt(fields["manga_id"], 10, 64)
+			if err != nil {
+				fmt.Errorf("invalid manga_id in redis for key %s: %v", key, err)
+				continue
+			}
 			data := &ProgressData{
 				UserID:  fields["user_id"],
-				MangaID: fields["manga_id"],
+				MangaID: mangaID,
 				Status:  fields["status"],
 			}
-			// Parse chapter as int
+			// Parse chapter as int64
 			if ch, ok := fields["chapter"]; ok {
-				fmt.Sscanf(ch, "%d", &data.Chapter)
+				data.Chapter, _ = strconv.ParseInt(ch, 10, 64)
 			}
 			// Parse timestamp
 			if ts, ok := fields["last_read_at"]; ok {
@@ -149,18 +154,18 @@ func (r *ProgressRepository) GetUserProgress(userID string) ([]*ProgressData, er
 }
 
 // Delete progress
-func (r *ProgressRepository) DeleteProgress(userID, mangaID string) error {
-	key := fmt.Sprintf("progress:user:%s:manga:%s", userID, mangaID)
+func (r *ProgressRedisRepo) DeleteProgress(userID string, mangaID int64) error {
+	key := fmt.Sprintf("progress:user:%s:manga:%d", userID, mangaID)
 	return r.client.Del(r.ctx, key).Err()
 }
 
 // // Atomic increment (for chapter/page tracking) - example for incrementing chapter
-// func (r *ProgressRepository) IncrementPage(userID, mangaID string) error {
+// func (r *ProgressRedisRepo) IncrementPage(userID, mangaID string) error {
 // 	key := fmt.Sprintf("progress:user:%s:manga:%s", userID, mangaID)
 // 	field := "page"
 // 	return r.client.HIncrBy(r.ctx, key, field, 1).Err()
 // }
 
-func (r *ProgressRepository) Close() error {
+func (r *ProgressRedisRepo) Close() error {
 	return r.client.Close()
 }

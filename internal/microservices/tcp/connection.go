@@ -22,11 +22,14 @@ const MaxMessageSize = 1024 * 1024          // 1MB max message size
 const MaxDeadlineDuration = 5 * time.Minute // 5min max read timeout duration
 
 type ClientConnection struct {
-	ID      string // unique identifier = key in map
-	conn    net.Conn
-	Writer  *bufio.Writer
-	Manager *ConnectionManager // reference to the connection manager for use the broadcast method
-	Limiter *rate.Limiter      // rate limiter for rate of sending messages
+	ID            string // unique identifier = key in map
+	conn          net.Conn
+	Writer        *bufio.Writer
+	Manager       *ConnectionManager // reference to the connection manager for use the broadcast method
+	Limiter       *rate.Limiter      // rate limiter for rate of sending messages
+	UserID        string             // authenticated user ID (from JWT)
+	Username      string             // authenticated username (from JWT)
+	Authenticated bool               // whether the connection is authenticated
 }
 
 // constructor for Connection
@@ -155,27 +158,38 @@ func (c *ClientConnection) Listen() {
 func (c *ClientConnection) HandleProgressMessage(data map[string]any) {
 	// Extract data
 	userID, _ := data["user_id"].(string)
-	mangaID, _ := data["manga_id"].(string)
+	mangaID, _ := data["manga_id"].(float64)
 	chapter, _ := data["chapter"].(float64) // JSON numbers are float64
 
-	// Save to Redis (skip if progressRepo client is nil - testing mode)
-	if c.Manager.progressRepo != nil && c.Manager.progressRepo.client != nil {
+	// Save to repository (works with both Redis-only and Hybrid)
+	if c.Manager.progressRepo != nil {
 		progressData := &ProgressData{
 			UserID:     userID,
-			MangaID:    mangaID,
-			Chapter:    int(chapter),
+			MangaID:    int64(mangaID),
+			Chapter:    int64(chapter),
 			LastReadAt: time.Now(),
 			Status:     "reading",
 		}
 
 		if err := c.Manager.progressRepo.SaveProgress(progressData); err != nil {
-			fmt.Printf("Error saving progress: %v\n", err)
+			c.Manager.logger.Error("progress_save_failed",
+				"client_id", c.ID,
+				"user_id", userID,
+				"error", err.Error(),
+			)
 			return
 		}
+
+		c.Manager.logger.Info("progress_saved",
+			"client_id", c.ID,
+			"user_id", userID,
+			"manga_id", int64(mangaID),
+			"chapter", int64(chapter),
+		)
 	}
 
 	// Broadcast to other clients
-	payload, _ := json.Marshal(map[string]interface{}{
+	payload, _ := json.Marshal(map[string]any{
 		"type":      "progress_broadcast",
 		"data":      data,
 		"timestamp": time.Now().Unix(),
