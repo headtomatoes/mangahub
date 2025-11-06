@@ -49,6 +49,10 @@ func NewProgressRedisRepo(redisAddr string) (*ProgressRedisRepo, error) {
 
 // Save progress (upsert)
 func (r *ProgressRedisRepo) SaveProgress(data *ProgressData) error {
+	if r == nil || r.client == nil {
+		// No-op for testing/mock mode - return success
+		return nil
+	}
 	key := fmt.Sprintf("progress:user:%s:manga:%d", data.UserID, data.MangaID)
 
 	// Convert struct to a map[string]any for HSET
@@ -72,6 +76,10 @@ func (r *ProgressRedisRepo) SaveProgress(data *ProgressData) error {
 
 // Get progress
 func (r *ProgressRedisRepo) GetProgress(userID string, mangaID int64) (*ProgressData, error) {
+	if r == nil || r.client == nil {
+		// No-op for testing/mock mode - return not found
+		return nil, nil
+	}
 	key := fmt.Sprintf("progress:user:%s:manga:%d", userID, mangaID)
 
 	// Use HGetAll to retrieve all fields from hash
@@ -105,6 +113,10 @@ func (r *ProgressRedisRepo) GetProgress(userID string, mangaID int64) (*Progress
 
 // Get all manga progress for a user
 func (r *ProgressRedisRepo) GetUserProgress(userID string) ([]*ProgressData, error) {
+	if r == nil || r.client == nil {
+		// No-op for testing/mock mode - return empty list
+		return []*ProgressData{}, nil
+	}
 	pattern := fmt.Sprintf("progress:user:%s:manga:*", userID)
 	var results []*ProgressData
 	var cursor uint64
@@ -155,6 +167,10 @@ func (r *ProgressRedisRepo) GetUserProgress(userID string) ([]*ProgressData, err
 
 // Delete progress
 func (r *ProgressRedisRepo) DeleteProgress(userID string, mangaID int64) error {
+	if r == nil || r.client == nil {
+		// No-op for testing/mock mode
+		return nil
+	}
 	key := fmt.Sprintf("progress:user:%s:manga:%d", userID, mangaID)
 	return r.client.Del(r.ctx, key).Err()
 }
@@ -167,5 +183,9 @@ func (r *ProgressRedisRepo) DeleteProgress(userID string, mangaID int64) error {
 // }
 
 func (r *ProgressRedisRepo) Close() error {
+	if r == nil || r.client == nil {
+		// No-op for testing/mock mode
+		return nil
+	}
 	return r.client.Close()
 }
