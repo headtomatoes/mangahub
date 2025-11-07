@@ -154,3 +154,17 @@ CREATE TABLE user_library (
 CREATE INDEX idx_user_library_user_id ON user_library(user_id);
 CREATE INDEX idx_user_library_manga_id ON user_library(manga_id);
 
+CREATE TABLE notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    manga_id BIGINT REFERENCES manga(id) ON DELETE CASCADE,
+    title TEXT,
+    message TEXT NOT NULL,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);

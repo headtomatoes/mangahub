@@ -13,6 +13,7 @@ type LibraryRepository interface {
     Remove(ctx context.Context, userID string, mangaID int64) error
     List(ctx context.Context, userID string) ([]models.UserLibrary, error)
     Exists(ctx context.Context, userID string, mangaID int64) (bool, error)
+    GetUserIDsByMangaID(ctx context.Context, mangaID int64) ([]string, error)
 }
 
 type libraryRepository struct {
@@ -74,4 +75,17 @@ func (r *libraryRepository) Exists(ctx context.Context, userID string, mangaID i
         return false, err
     }
     return count > 0, nil
+}
+
+func (r *libraryRepository) GetUserIDsByMangaID(ctx context.Context, mangaID int64) ([]string, error) {
+    var userIDs []string
+    
+    if err := r.db.WithContext(ctx).
+        Model(&models.UserLibrary{}).
+        Where("manga_id = ?", mangaID).
+        Pluck("user_id", &userIDs).Error; err != nil {
+        return nil, fmt.Errorf("get user IDs by manga: %w", err)
+    }
+    
+    return userIDs, nil
 }

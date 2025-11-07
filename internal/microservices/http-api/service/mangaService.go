@@ -1,9 +1,13 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
@@ -67,7 +71,13 @@ func (s *mangaService) Create(ctx context.Context, m *models.Manga) error {
 		m.Author = &a
 	}
 
-	return s.repo.Create(ctx, m)
+	if err := s.repo.Create(ctx, m); err != nil {
+		return err
+	}
+
+	// notify UDP server (best-effort, non-blocking)
+	go notifyNewManga(m.ID, m.Title)
+	return nil
 }
 
 func (s *mangaService) Update(ctx context.Context, id int64, m *models.Manga) error {
@@ -108,7 +118,35 @@ func (s *mangaService) Update(ctx context.Context, id int64, m *models.Manga) er
 
 	// update updated_at business rule could be here
 
-	return s.repo.Update(ctx, id, existing)
+	if err := s.repo.Update(ctx, id, existing); err != nil {
+		return err
+	}
+
+	// fire a best-effort notification about the update
+	go notifyMangaUpdate(id, existing.Title)
+	return nil
+}
+
+// notifyNewManga posts to the UDP service HTTP trigger. Non-blocking caller should
+// call this in a goroutine.
+func notifyNewManga(mangaID int64, title string) {
+	url := os.Getenv("UDP_TRIGGER_URL")
+	if url == "" {
+		url = "http://udp-server:8085/notify/new-manga"
+	}
+	payload := map[string]interface{}{"manga_id": mangaID, "title": title}
+	b, _ := json.Marshal(payload)
+	_, _ = http.Post(url, "application/json", bytes.NewReader(b))
+}
+
+func notifyMangaUpdate(mangaID int64, title string) {
+	url := os.Getenv("UDP_TRIGGER_URL")
+	if url == "" {
+		url = "http://udp-server:8085/notify/new-manga"
+	}
+	payload := map[string]interface{}{"manga_id": mangaID, "title": title}
+	b, _ := json.Marshal(payload)
+	_, _ = http.Post(url, "application/json", bytes.NewReader(b))
 }
 
 func (s *mangaService) Delete(ctx context.Context, id int64) error {

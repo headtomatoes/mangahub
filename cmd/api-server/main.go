@@ -60,6 +60,7 @@ func main() {
 		&models.RefreshToken{},
 		&models.UserLibrary{},
 		&models.UserProgress{},
+		&models.Notification{},
 	); err != nil {
 		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
@@ -90,6 +91,11 @@ func main() {
 	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
 	progressHandler := h.NewProgressHandler(progressSvc)
 
+	// notification setup
+    notificationRepo := repo.NewNotificationRepository(gdb)
+    notificationSvc := svc.NewNotificationService(notificationRepo)
+    notificationHandler := h.NewNotificationHandler(notificationSvc)
+
 	// Gin setup
 	r := gin.New()
 	r.Use(gin.Logger())
@@ -111,6 +117,8 @@ func main() {
 		genreHandler.RegisterRoutes(api.Group("/genres"))
 		libraryHandler.RegisterRoutes(api.Group("/library"))
 		progressHandler.RegisterRoutes(api.Group("/progress"))
+		notificationHandler.RegisterRoutes(api.Group("/notifications")) // Add this
+
 	}
 
 	// Health/readiness
