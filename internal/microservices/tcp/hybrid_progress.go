@@ -2,7 +2,9 @@ package tcp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 )
 
@@ -15,6 +17,10 @@ type HybridProgressRepository struct {
 	writeChan chan *ProgressData
 	stopChan  chan struct{}
 	logger    *slog.Logger
+	closed    atomic.Bool // to prevent multiple closes
+	// atomic boolean to ensure Close is only called once
+	// across multiple goroutines
+	// useful in this case rather than mutex for simplicity
 }
 
 // NewHybridProgressRepository creates a new hybrid progress repository
@@ -29,15 +35,33 @@ func NewHybridProgressRepository(redis *ProgressRedisRepo, postgres *ProgressPos
 }
 
 // SaveProgress writes to Redis immediately, queues for PostgreSQL batch write
+// the problem with this approach is when queue is full => spawn a goroutine to help main writer drain the queue
+// which dont happen => each goroutine compete for the same resource => blocked main writer => more goroutine spawned =>
+// fix: we choose 1st way(backpressure) for simplicity(this can be improved later)
+// 1. backpressure: if channel is full, block until there is space (slows down clients, but prevents overload)
+// 2. drop old data: if channel is full, drop oldest data to make space for new data (data loss, but keeps system responsive)
+// 3. direct write fallback: if channel is full, spawn a goroutine to write directly to PostgreSQL (more complex, but prevents data loss and keeps system responsive)
+// 4. increase channel buffer size: make channel larger to reduce chance of being full (uses more memory, but simpler)
 func (r *HybridProgressRepository) SaveProgress(data *ProgressData) error {
-	// 1. Write to Redis immediately (fast)
+	// 0. Check if repository is closed
+	if r.closed.Load() {
+		return fmt.Errorf("repository is closed")
+	}
+	// 1. Write to Redis immediately (fast) + required
 	if err := r.redis.SaveProgress(data); err != nil {
 		r.logger.Error("redis_save_failed",
 			"user_id", data.UserID,
 			"manga_id", data.MangaID,
 			"error", err,
 		)
-		// Continue to queue for PostgreSQL even if Redis fails
+		return fmt.Errorf("redis write failed: %w", err)
+	}
+	// Monitor write channel depth
+	queueDepth := len(r.writeChan)
+	if queueDepth > cap(r.writeChan)/2 {
+		r.logger.Warn("write_queue_high_watermark",
+			"queue_depth", queueDepth,
+		)
 	}
 
 	// 2. Queue for PostgreSQL batch write (async)
@@ -45,20 +69,21 @@ func (r *HybridProgressRepository) SaveProgress(data *ProgressData) error {
 	case r.writeChan <- data:
 		// Successfully queued
 	default:
-		// Channel full, force direct write in goroutine
-		r.logger.Warn("write_queue_full",
+		// Queue full - try synchronous write as fallback
+		r.logger.Warn("write_queue_full, attempting direct postgres write",
 			"user_id", data.UserID,
-			"manga_id", data.MangaID,
 		)
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := r.postgres.SaveProgress(ctx, data); err != nil {
-				r.logger.Error("postgres_direct_write_failed", "error", err)
-			}
-		}()
-	}
 
+		// Use a SHORT timeout for sync write => avoid blocking too long
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		if err := r.postgres.SaveProgress(ctx, data); err != nil {
+			r.logger.Error("postgres_direct_write_failed", "error", err)
+			// Data is safely in Redis, will retry on next batch
+			return fmt.Errorf("postgres direct write failed: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -176,7 +201,10 @@ func (r *HybridProgressRepository) flushBatch(batch []*ProgressData) {
 
 // Close closes both Redis and PostgreSQL connections and stops the batch writer
 func (r *HybridProgressRepository) Close() error {
+	// Ensure Close is only called once
+	r.closed.Store(true)
 	close(r.stopChan)
+	time.Sleep(100 * time.Millisecond) // Drain in-flight => means wait for batch writer to exit
 	close(r.writeChan)
 
 	// Close Redis

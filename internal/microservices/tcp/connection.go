@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -20,6 +21,8 @@ import (
 
 const MaxMessageSize = 1024 * 1024          // 1MB max message size
 const MaxDeadlineDuration = 5 * time.Minute // 5min max read timeout duration
+const MaxRate = 50                          // 50 messages per second
+const BurstSize = 100                       // allow bursts of up to 100 messages
 
 type ClientConnection struct {
 	ID            string // unique identifier = key in map
@@ -30,6 +33,7 @@ type ClientConnection struct {
 	UserID        string             // authenticated user ID (from JWT)
 	Username      string             // authenticated username (from JWT)
 	Authenticated bool               // whether the connection is authenticated
+	logger        *slog.Logger
 }
 
 // constructor for Connection
@@ -39,7 +43,8 @@ func NewClientConnection(conn net.Conn, manager *ConnectionManager) *ClientConne
 		conn:    conn,
 		Writer:  bufio.NewWriter(conn),
 		Manager: manager,
-		Limiter: rate.NewLimiter(rate.Limit(10), 20), // 10 msgs/sec with burst of 20
+		Limiter: rate.NewLimiter(rate.Limit(MaxRate), BurstSize), // 50 msgs/sec with burst of 100
+		logger:  manager.logger,
 		// the limiter auto depletes tokens when Allow is called and refills over time
 	}
 }
@@ -148,7 +153,7 @@ func (c *ClientConnection) Listen() {
 				)
 				continue
 			}
-			c.Manager.Broadcast(payload)
+			c.Manager.Broadcast(payload, c.ID)
 		}
 	}
 }
@@ -157,9 +162,38 @@ func (c *ClientConnection) Listen() {
 // progress messages
 func (c *ClientConnection) HandleProgressMessage(data map[string]any) {
 	// Extract data
-	userID, _ := data["user_id"].(string)
+
+	// check for authorize user
+	userID, ok := data["user_id"].(string)
+	if !ok || userID == "" {
+		c.Send([]byte(`{
+		"type":"error",
+		"code":"INVALID_USER_ID",
+		"message":"Missing or invalid user_id"}`))
+	}
+
+	if c.Authenticated && userID != c.UserID {
+		c.logger.Warn(
+			"unauthorized_progress_update",
+			"client_user_id", c.UserID,
+			"attempted_user_id", userID)
+		c.Send([]byte(`{
+		"type":"error",
+		"code":"FORBIDDEN",
+		"message":"Cannot update other user's progress"}`))
+		return
+	}
 	mangaID, _ := data["manga_id"].(float64)
 	chapter, _ := data["chapter"].(float64) // JSON numbers are float64
+
+	// Validate data ranges
+	if mangaID <= 0 || chapter < 0 {
+		c.Send([]byte(`{
+		"type":"error",
+		"code":"INVALID_DATA",
+		"message":"Invalid manga_id or chapter"}`))
+		return
+	}
 
 	// Save to repository (works with both Redis-only and Hybrid)
 	if c.Manager.progressRepo != nil {
@@ -177,6 +211,14 @@ func (c *ClientConnection) HandleProgressMessage(data map[string]any) {
 				"user_id", userID,
 				"error", err.Error(),
 			)
+
+			errResponse, _ := json.Marshal(map[string]any{
+				"type":    "progress_error",
+				"code":    "SAVE_FAILED",
+				"message": "Failed to save progress",
+				"error":   err.Error(),
+			})
+			c.Send(errResponse)
 			return
 		}
 
@@ -194,7 +236,8 @@ func (c *ClientConnection) HandleProgressMessage(data map[string]any) {
 		"data":      data,
 		"timestamp": time.Now().Unix(),
 	})
-	c.Manager.Broadcast(payload)
+
+	c.Manager.Broadcast(payload, c.ID)
 }
 
 // method to send data over the connection

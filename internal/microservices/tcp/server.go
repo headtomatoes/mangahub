@@ -34,7 +34,11 @@ type TCPServer struct {
 	// structured logger for logging server events
 	batchWriterCtx    context.Context
 	batchWriterCancel context.CancelFunc
-	// context for batch writer lifecycle
+	// context for batch writer lifecycle (hybrid storage mode)
+	listenerMu sync.RWMutex
+	listener   net.Listener
+	// TCP listener for accepting incoming connections
+	// mutex to protect access to listener during shutdown
 }
 
 // NewServer creates a TCP server with Redis-only storage (backward compatible)
@@ -132,19 +136,34 @@ func (s *TCPServer) Start() error {
 		)
 		return fmt.Errorf("failed to start TCP server, error: %v", err)
 	}
-	defer listener.Close()
 	s.logger.Info("server_started",
 		"addr", s.Addr,
 	)
+
+	s.listenerMu.Lock()
+	s.listener = listener // store listener for later use in shutdown
+	s.listenerMu.Unlock()
+
+	// Close listener on quit signal
+	go func() { // goroutine to handle shutdown
+		<-s.quitChan     // wait for quit signal
+		listener.Close() // close listener to stop accepting new connections
+		s.logger.Info("listener_closed")
+	}()
+
 	// accept connections in a loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			s.logger.Error(
-				"failed_to_accept_connection",
-				"error", err.Error(),
-			)
-			continue
+			// check if the error is due to listener being closed
+			select {
+			case <-s.quitChan:
+				s.logger.Info("listener_currently_shut_down")
+				return nil
+			default:
+				s.logger.Info("failed_to_accept_connections", "error", err.Error())
+				continue
+			}
 		}
 		// add +1 to wait group for the new connection handler goroutine
 		s.wg.Add(1)
@@ -236,11 +255,19 @@ func (s *TCPServer) authenticateClient(client *ClientConnection) bool {
 
 // stop the server
 func (s *TCPServer) Stop() {
-	close(s.quitChan)                                                         // signal all goroutines to shutdown
+	close(s.quitChan)
+	// signal all goroutines to shutdown
 	s.Manager.BroadcastSystemMessage("Server is shutting down in 5 seconds.") // notify clients
 	time.Sleep(5 * time.Second)                                               // wait for a moment to allow clients to process the shutdown message
 	s.Manager.CloseAllConnections()                                           // close all active connections
-	s.wg.Wait()                                                               // wait for all goroutines to finish
+	s.wg.Wait()
+
+	// Close the listener
+	s.listenerMu.Lock()
+	if s.listener != nil {
+		s.listener.Close()
+	}
+	s.listenerMu.Unlock()
 
 	// Stop batch writer if it's running (hybrid mode)
 	if s.batchWriterCancel != nil {
