@@ -1,194 +1,111 @@
-# Notification Sync Implementation for Offline Users
 
-## Overview
-This document describes how the MangaHub notification system handles offline users and syncs missed notifications when they reconnect.
+# Notification Sync Implementation for Offline Users (Detailed Code Workflow)
 
-## Requirements
-✅ **Since UDP does not guarantee delivery for offline users:**
-- The system saves all unread notifications to the database for both online and offline users
-- When a user reconnects, the server detects it and automatically pushes missed updates via UDP
+## What I'm adding
+This file now expands the existing explanation into a developer-focused, code-level workflow for the UDP notification mechanism implemented in this repository. It references the main files in `internal/microservices/udp-server/` and the related HTTP notification handlers so you can trace the end-to-end flow.
 
-## Implementation Details
+## Goals
+- Ensure no notification is lost when users are offline (persistence + sync)
+- Use UDP for low-latency pushes to online users
+- Provide a reconnection sync path for missed notifications
 
-### 1. Notification Storage (Already Implemented)
-**File:** `internal/microservices/udp-server/broadcaster.go`
+## Files / Components Involved
+- `internal/microservices/udp-server/broadcaster.go` — prepares notifications for users and persists them
+- `internal/microservices/udp-server/server.go` — UDP server loop; handles SUBSCRIBE, UNSUBSCRIBE and sync on reconnect
+- `internal/microservices/udp-server/subscriber.go` — subscription manager (maps userID -> UDP address, manages online set)
+- `internal/microservices/udp-server/notification.go` — serialization / message shapes used over UDP (e.g. `Notification.ToJSON()`)
+- `internal/microservices/http-api/handler/notification_handler.go` — HTTP endpoints to fetch/mark notifications read
+- Database repos: notificationRepo, libraryRepo used by broadcaster and server
 
-```go
-// BroadcastToLibraryUsers sends notification AND stores it for offline users
-func (b *Broadcaster) BroadcastToLibraryUsers(ctx context.Context, mangaID int64, notification *Notification) error {
-    // Get all users who have this manga in their library
-    userIDs, err := b.libraryRepo.GetUserIDsByMangaID(ctx, mangaID)
-    
-    // Store notification in database for ALL users (online and offline)
-    for _, userID := range userIDs {
-        dbNotification := &models.Notification{
-            UserID:  userID,
-            Type:    string(notification.Type),
-            MangaID: mangaID,
-            Title:   notification.Title,
-            Message: notification.Message,
-            Read:    false, // Initially unread
-        }
-        b.notificationRepo.Create(ctx, dbNotification)
-    }
-    
-    // Send to currently online subscribers via UDP
-    subscribers := b.subManager.GetByUserIDs(userIDs)
-    // ... send UDP notifications ...
-}
+## Data shapes and contracts
+- Notification (UDP payload): { Type, MangaID, Title, Message, Timestamp }
+- DB Notification model: { ID, UserID, Type, MangaID, Title, Message, Read, CreatedAt }
+- Subscription request: client sends a small UDP message (e.g. { Action: "SUBSCRIBE", UserID: "..." }) to register its current UDP address
+
+## End-to-end Workflow (step-by-step)
+
+1) New content event (publisher side)
+   - A new chapter / content event triggers the broadcaster flow. In code: `Broadcaster.BroadcastToLibraryUsers(ctx, mangaID, notification)`.
+
+2) Resolve recipients
+   - `BroadcastToLibraryUsers` calls `libraryRepo.GetUserIDsByMangaID(ctx, mangaID)` to get all user IDs who have the manga in their library.
+
+3) Persist notifications for all recipients
+   - For each userID, the broadcaster creates a `models.Notification` with `Read = false` and calls `notificationRepo.Create(ctx, dbNotification)`.
+   - This ensures durability: even if UDP delivery fails, the notification is stored.
+
+4) Send realtime UDP to online subscribers
+   - The broadcaster asks the subscription manager for active addresses: `subscribers := b.subManager.GetByUserIDs(userIDs)` (returns only online users)
+   - For each online subscriber it serializes the `Notification` (via `Notification.ToJSON()`) and calls `s.conn.WriteToUDP(payload, addr)`.
+   - The code treats UDP as best-effort: errors are logged, but persistence guarantees later sync.
+
+5) Client-side: subscription
+   - Client opens a UDP socket and sends a SUBSCRIBE message containing its `UserID`.
+   - Server receives the SUBSCRIBE and registers the mapping in `subManager` (userID -> net.UDPAddr).
+
+6) Subscribe acknowledgement and non-blocking sync
+   - Server sends a confirmation UDP message back to the client right away: a small `Notification` of type `NotificationSubscribe`.
+   - To avoid blocking the confirmation, the server spawns a goroutine: `go s.syncMissedNotifications(req.UserID, addr)` to push missed notifications asynchronously.
+
+7) Sync missed notifications (reconnection path)
+   - `syncMissedNotifications(userID, addr)`:
+     - Uses `notificationRepo.GetUnreadByUser(ctx, userID)` to fetch all unread notifications for that user.
+     - Iterates them, converts each DB model to UDP `Notification` payload, and sends via `s.conn.WriteToUDP(payload, addr)`.
+     - Sleeps a small amount between sends (e.g. 50ms) to avoid overwhelming clients or network bursts.
+     - The method does not assume UDP delivery; it's a push-only sync. If you need strong delivery, add ACKs or switch to TCP for sync or use reliable retransmit.
+
+8) Mark read / cleanup
+   - The user may mark notifications as read via HTTP endpoints provided by `notification_handler.go`:
+     - `GET /api/notifications/unread` — to list unread
+     - `PUT /api/notifications/:id/read` — to mark one as read
+     - `PUT /api/notifications/read-all` — to mark all as read
+   - Optionally, the server could auto-mark notifications as read after successful sync (not implemented by default).
+
+## Subscription manager (behavioral notes)
+- The subManager keeps an in-memory mapping of online users to their UDP addresses. Typical operations:
+  - Add(userID, addr)
+  - Remove(userID)
+  - GetByUserIDs([]userID) -> []addr
+- Since this is in-memory, server restarts clear online state; persisted DB guarantees re-sync on next SUBSCRIBE.
+
+## Error handling, guarantees and trade-offs
+- UDP is low-latency but unreliable. The system guarantees eventual delivery by persisting notifications in DB and re-sending on reconnect.
+- Current behavior is "at-least-stored" but not strictly "at-least-once" over UDP; clients may receive duplicates (server should let clients dedupe by notification ID or timestamp).
+- syncMissedNotifications pushes unread items but does not wait for client ACKs — adding ACKs would allow marking delivered notifications as read automatically.
+- For large backlogs, consider batching (e.g. send an array of notifications) or limiting N recent notifications to avoid flooding clients.
+
+## Edge cases and recommended handling
+- Client reconnects from a new NAT/port: SUBSCRIBE registers the new `net.UDPAddr`, and sync will go to the new address.
+- Multiple devices per user: subManager may only store one address per userID; to support multiple devices store a list of addresses per user.
+- Large backlog for a user: either stream in chunks and request client ACKs per-chunk or limit to last-N notifications.
+- Clock skew: use server-created timestamps (`CreatedAt`) for ordering rather than client timestamps.
+
+## Tests and verification
+- Unit tests exist near `internal/microservices/udp-server/` (files like `server_test.go`, `subscriber_test.go`, `broadcaster_test.go`, `notification_test.go`). Run them with:
+
+```bash
+# from repository root
+go test ./internal/microservices/udp-server -v
 ```
 
-**Key Points:**
-- Notifications are saved to the database for **all users** (both online and offline)
-- Each notification has a `read` flag (default: `false`)
-- Online users receive immediate UDP notification
-- Offline users will get notified when they reconnect
+- Manual smoke test:
+  1. Start the UDP server (run the binary under `cmd/udp-server` or `go run` the server main).
+  2. Use the provided `udp-client` (in `cmd/udp-client`) or a small test client to SUBSCRIBE.
+  3. Trigger a broadcast (via code or an API that produces a new chapter event).
+  4. Observe immediate UDP delivery for online client and DB persistence for all users.
 
-### 2. Sync on Reconnection (NEW Implementation)
-**File:** `internal/microservices/udp-server/server.go`
+## Small improvements to consider (non-breaking)
+- Add an ACK/confirm message from client to server for sync deliveries; server can then mark those notifications as delivered/read.
+- Implement batching for sync (send an array of notifications as a single UDP payload) to reduce per-packet overhead.
+- Support multiple addresses per user (multiple devices) in `subManager`.
+- Add metrics for: notifications persisted, realtime UDP sent, sync count per reconnect, and average sync time.
 
-#### When User Subscribes (Reconnects):
-```go
-case "SUBSCRIBE":
-    s.subManager.Add(req.UserID, addr)
-    log.Printf("User %s subscribed from %s", req.UserID, addr.String())
-    
-    // Send confirmation
-    confirmation := &Notification{
-        Type:      NotificationSubscribe,
-        Message:   "Successfully subscribed to notifications",
-        Timestamp: time.Now(),
-    }
-    s.conn.WriteToUDP(confirmation.ToJSON(), addr)
-    
-    // SYNC: Push missed notifications to reconnecting user
-    go s.syncMissedNotifications(req.UserID, addr)
-```
+## Summary (requirements coverage)
+- Persist notifications for all users: Done (broadcaster stores unread notifications in DB).
+- Deliver realtime notifications via UDP to online users: Done (broadcaster sends to addresses from `subManager`).
+- Sync missed notifications on reconnect: Done (server `syncMissedNotifications` is triggered after SUBSCRIBE).
 
-#### Sync Method:
-```go
-func (s *Server) syncMissedNotifications(userID string, addr *net.UDPAddr) {
-    // Get all unread notifications from database
-    unreadNotifs, err := s.notificationRepo.GetUnreadByUser(ctx, userID)
-    
-    // Send each notification via UDP
-    for _, dbNotif := range unreadNotifs {
-        notification := &Notification{
-            Type:      NotificationType(dbNotif.Type),
-            MangaID:   dbNotif.MangaID,
-            Title:     dbNotif.Title,
-            Message:   dbNotif.Message,
-            Timestamp: dbNotif.CreatedAt,
-        }
-        s.conn.WriteToUDP(notification.ToJSON(), addr)
-        time.Sleep(50 * time.Millisecond) // Avoid overwhelming client
-    }
-}
-```
+If you want, I can also:
+- Add client-side example (Go or JS) showing SUBSCRIBE and ACK flow.
+- Implement auto-mark-as-read-after-ACK in the server and update HTTP handlers accordingly.
 
-**Key Points:**
-- Runs asynchronously (in a goroutine) to not block the subscribe confirmation
-- Retrieves all unread notifications for the user
-- Sends them one by one via UDP
-- Includes a small delay (50ms) between sends to avoid overwhelming the client
-
-### 3. Mark as Read (Via HTTP API)
-**File:** `internal/microservices/http-api/handler/notification_handler.go`
-
-Users can mark notifications as read via HTTP endpoints:
-- `GET /api/notifications/unread` - Fetch all unread notifications
-- `PUT /api/notifications/:id/read` - Mark specific notification as read
-- `PUT /api/notifications/read-all` - Mark all as read
-
-## Flow Diagram
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ NEW CHAPTER PUBLISHED                                        │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-    ┌────────────────────────────┐
-    │ BroadcastToLibraryUsers()  │
-    └────────────┬───────────────┘
-                 │
-        ┌────────┴────────┐
-        ▼                 ▼
-┌───────────────┐  ┌─────────────────┐
-│ Save to DB    │  │ Send UDP to     │
-│ for ALL users │  │ ONLINE users    │
-│ (read=false)  │  │ only            │
-└───────────────┘  └─────────────────┘
-        │
-        │
-        ▼
-┌─────────────────────────────────────┐
-│ OFFLINE USER                         │
-│ - Notification stored in DB          │
-│ - Will receive when reconnecting     │
-└──────────────┬──────────────────────┘
-               │
-               │ (User reconnects)
-               ▼
-    ┌──────────────────────┐
-    │ SUBSCRIBE request    │
-    └──────────┬───────────┘
-               │
-               ▼
-    ┌──────────────────────────────┐
-    │ syncMissedNotifications()    │
-    │ - Fetch unread from DB       │
-    │ - Send all via UDP           │
-    └──────────────────────────────┘
-               │
-               ▼
-    ┌──────────────────────────────┐
-    │ User receives all missed     │
-    │ notifications via UDP        │
-    └──────────────────────────────┘
-               │
-               ▼
-    ┌──────────────────────────────┐
-    │ User marks as read via       │
-    │ HTTP API (optional)          │
-    └──────────────────────────────┘
-```
-
-## Testing Scenarios
-
-### Scenario 1: User is Online
-1. New chapter published
-2. Notification saved to DB (read=false)
-3. UDP notification sent immediately
-4. User receives notification in real-time
-
-### Scenario 2: User is Offline
-1. New chapter published
-2. Notification saved to DB (read=false)
-3. UDP send fails (user offline)
-4. **User reconnects later**
-5. **Server automatically syncs all missed notifications**
-6. User receives all missed notifications
-
-### Scenario 3: User Misses Multiple Notifications
-1. Multiple chapters published while user offline
-2. All notifications saved to DB
-3. User reconnects
-4. Server sends all missed notifications (with 50ms delay between each)
-5. User receives all updates in order
-
-## Advantages of This Approach
-
-1. **Reliability:** No notification is lost - all are persisted in DB
-2. **Automatic Sync:** Users automatically receive missed updates on reconnection
-3. **UDP Efficiency:** Real-time notifications for online users
-4. **Fallback:** HTTP API allows users to manually fetch missed notifications if needed
-5. **Scalable:** Async processing doesn't block the subscription flow
-
-## Future Enhancements (Optional)
-
-1. **Auto-mark as read after sync:** Automatically mark notifications as read after successful UDP delivery
-2. **Batch sync:** Send notifications in batches instead of one by one
-3. **Sync confirmation:** Client sends ACK after receiving synced notifications
-4. **Priority queue:** Send most important notifications first
-5. **Max sync limit:** Only sync last N notifications to avoid overload
