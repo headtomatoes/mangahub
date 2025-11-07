@@ -18,11 +18,12 @@ type Server struct {
 	subManager       *SubscriberManager
 	broadcaster      *Broadcaster
 	notificationRepo repository.NotificationRepository
+	userRepo         repository.UserRepository
 	done             chan struct{}
 }
 
 // NewServer creates a new UDP server
-func NewServer(port string, libraryRepo repository.LibraryRepository, notificationRepo repository.NotificationRepository) (*Server, error) {
+func NewServer(port string, libraryRepo repository.LibraryRepository, notificationRepo repository.NotificationRepository, userRepo repository.UserRepository) (*Server, error) {
 	addr, err := net.ResolveUDPAddr("udp", ":"+port)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve UDP address: %w", err)
@@ -34,13 +35,14 @@ func NewServer(port string, libraryRepo repository.LibraryRepository, notificati
 	}
 
 	subManager := NewSubscriberManager(5 * time.Minute)
-	broadcaster := NewBroadcaster(conn, subManager, libraryRepo, notificationRepo)
+	broadcaster := NewBroadcaster(conn, subManager, libraryRepo, notificationRepo, userRepo)
 
 	return &Server{
 		conn:             conn,
 		subManager:       subManager,
 		broadcaster:      broadcaster,
 		notificationRepo: notificationRepo,
+		userRepo:         userRepo,
 		done:             make(chan struct{}),
 	}, nil
 }
@@ -173,6 +175,11 @@ func (s *Server) syncMissedNotifications(userID string, addr *net.UDPAddr) {
 			log.Printf("Failed to send notification %d to %s: %v", dbNotif.ID, addr.String(), err)
 		} else {
 			log.Printf("Synced notification %d to user %s", dbNotif.ID, userID)
+
+			// Mark notification as read so it won't be sent again
+			if err := s.notificationRepo.MarkAsRead(ctx, dbNotif.ID); err != nil {
+				log.Printf("Failed to mark notification %d as read for user %s: %v", dbNotif.ID, userID, err)
+			}
 		}
 
 		// Small delay to avoid overwhelming the client

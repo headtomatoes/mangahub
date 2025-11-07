@@ -36,3 +36,8 @@ docker compose build db
 docker compose up -d db
 
 docker-compose restart api-server
+
+
+go run ./cmd/udp-client
+go build ./cmd/udp-server && go build ./cmd/api-server
+

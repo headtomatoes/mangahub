@@ -31,9 +31,10 @@ func main() {
 	// Initialize repositories
 	libraryRepo := repository.NewLibraryRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
+	userRepo := repository.NewUserRepository(db)
 
 	// Create and start UDP server
-	server, err := udp.NewServer(port, libraryRepo, notificationRepo)
+	server, err := udp.NewServer(port, libraryRepo, notificationRepo, userRepo)
 	if err != nil {
 		log.Fatalf("Failed to create UDP server: %v", err)
 	}
@@ -137,64 +138,3 @@ func main() {
 		log.Fatalf("UDP server error: %v", err)
 	}
 }
-
-// package main
-
-// import (
-// 	"encoding/json"
-// 	"log"
-// 	"net/http"
-// 	"os"
-
-// 	"mangahub/database"
-// 	"mangahub/internal/microservices/http-api/repository"
-// 	udp "mangahub/internal/microservices/udp-server"
-// )
-
-// func main() {
-// 	// Load environment variables
-// 	port := os.Getenv("UDP_PORT")
-// 	if port == "" {
-// 		port = "8082"
-// 	}
-
-// 	// Open GORM DB (same as API server)
-// 	db, err := database.OpenGorm()
-// 	if err != nil {
-// 		log.Fatalf("Failed to connect to database: %v", err)
-// 	}
-
-// 	log.Println("Database connected successfully")
-
-// 	// Initialize repository
-// 	libraryRepo := repository.NewLibraryRepository(db)
-
-// 	// Create and start UDP server
-// 	server, err := udp.NewServer(port, libraryRepo)
-// 	if err != nil {
-// 		log.Fatalf("Failed to create UDP server: %v", err)
-// 	}
-
-// 	// Start a small HTTP health endpoint on TCP :<port>
-// 	httpAddr := ":" + port
-// 	http.HandleFunc("/check-conn", func(w http.ResponseWriter, r *http.Request) {
-// 		resp := map[string]interface{}{
-// 			"ok":          true,
-// 			"service":     "udp-server",
-// 			"subscribers": server.SubscriberCount(),
-// 		}
-// 		w.Header().Set("Content-Type", "application/json")
-// 		_ = json.NewEncoder(w).Encode(resp)
-// 	})
-// 	go func() {
-// 		log.Printf("HTTP health endpoint listening on %s", httpAddr)
-// 		if err := http.ListenAndServe(httpAddr, nil); err != nil {
-// 			log.Fatalf("HTTP health server error: %v", err)
-// 		}
-// 	}()
-
-// 	log.Printf("Starting UDP notification server on port %s", port)
-// 	if err := server.Start(); err != nil {
-// 		log.Fatalf("UDP server error: %v", err)
-// 	}
-// }

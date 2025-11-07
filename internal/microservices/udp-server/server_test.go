@@ -20,7 +20,10 @@ func TestServer_Integration(t *testing.T) {
 	}
 
 	// Create server on random port
-	server, err := NewServer("0", mockLibRepo, mockNotifRepo)
+	// mock user repo for server
+	mockUsers1 := &mockUserRepo{ids: []string{"test-user-1", "test-user-2"}}
+
+	server, err := NewServer("0", mockLibRepo, mockNotifRepo, mockUsers1)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}
@@ -241,7 +244,10 @@ func TestServer_NotifyNewChapter_StoresForOfflineUsers(t *testing.T) {
 	}
 
 	// Create server
-	server, err := NewServer("0", mockLibRepo, mockNotifRepo)
+	// mock user repo for server
+	mockUsers2 := &mockUserRepo{ids: []string{"online-user", "offline-user1", "offline-user2"}}
+
+	server, err := NewServer("0", mockLibRepo, mockNotifRepo, mockUsers2)
 	if err != nil {
 		t.Fatalf("Failed to create server: %v", err)
 	}

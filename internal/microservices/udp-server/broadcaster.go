@@ -15,6 +15,7 @@ type Broadcaster struct {
 	subManager       *SubscriberManager
 	libraryRepo      repository.LibraryRepository
 	notificationRepo repository.NotificationRepository
+	userRepo         repository.UserRepository
 	mu               sync.RWMutex
 }
 
@@ -23,12 +24,14 @@ func NewBroadcaster(
 	subManager *SubscriberManager,
 	libraryRepo repository.LibraryRepository,
 	notificationRepo repository.NotificationRepository,
+	userRepo repository.UserRepository,
 ) *Broadcaster {
 	return &Broadcaster{
 		conn:             conn,
 		subManager:       subManager,
 		libraryRepo:      libraryRepo,
 		notificationRepo: notificationRepo,
+		userRepo:         userRepo,
 	}
 }
 
@@ -51,6 +54,8 @@ func (b *Broadcaster) BroadcastToLibraryUsers(ctx context.Context, mangaID int64
 	}
 
 	// Store notification in database for ALL users (online and offline)
+	// Keep a mapping of userID -> notification ID so we can mark delivered ones as read
+	notifIDs := make(map[string]int64)
 	for _, userID := range userIDs {
 		dbNotification := &models.Notification{
 			UserID:  userID,
@@ -62,7 +67,9 @@ func (b *Broadcaster) BroadcastToLibraryUsers(ctx context.Context, mangaID int64
 		}
 		if err := b.notificationRepo.Create(ctx, dbNotification); err != nil {
 			log.Printf("Failed to store notification for user %s: %v", userID, err)
+			continue
 		}
+		notifIDs[userID] = dbNotification.ID
 	}
 
 	// Send to currently online subscribers via UDP
@@ -75,6 +82,13 @@ func (b *Broadcaster) BroadcastToLibraryUsers(ctx context.Context, mangaID int64
 			defer wg.Done()
 			if err := b.sendToSubscriber(s, data); err != nil {
 				log.Printf("Failed to send to %s: %v", s.UserID, err)
+			} else {
+				// mark the stored notification for this user as read
+				if id, ok := notifIDs[s.UserID]; ok {
+					if err := b.notificationRepo.MarkAsRead(ctx, id); err != nil {
+						log.Printf("Failed to mark notification %d as read for user %s: %v", id, s.UserID, err)
+					}
+				}
 			}
 		}(sub)
 	}
@@ -93,6 +107,29 @@ func (b *Broadcaster) BroadcastToAll(notification *Notification) error {
 		return fmt.Errorf("failed to marshal notification: %w", err)
 	}
 
+	// Persist notification for all users so offline users can sync later
+	ctx := context.Background()
+	allUserIDs, err := b.userRepo.GetAllIDs(ctx)
+	if err != nil {
+		log.Printf("failed to fetch all user ids: %v", err)
+	}
+	notifIDs := make(map[string]int64)
+	for _, uid := range allUserIDs {
+		dbNotification := &models.Notification{
+			UserID:  uid,
+			Type:    string(notification.Type),
+			MangaID: notification.MangaID,
+			Title:   notification.Title,
+			Message: notification.Message,
+			Read:    false,
+		}
+		if err := b.notificationRepo.Create(ctx, dbNotification); err != nil {
+			log.Printf("Failed to store notification for user %s: %v", uid, err)
+			continue
+		}
+		notifIDs[uid] = dbNotification.ID
+	}
+
 	subscribers := b.subManager.GetAll()
 	var wg sync.WaitGroup
 
@@ -102,12 +139,18 @@ func (b *Broadcaster) BroadcastToAll(notification *Notification) error {
 			defer wg.Done()
 			if err := b.sendToSubscriber(s, data); err != nil {
 				log.Printf("Failed to send to %s: %v", s.UserID, err)
+			} else {
+				if id, ok := notifIDs[s.UserID]; ok {
+					if err := b.notificationRepo.MarkAsRead(ctx, id); err != nil {
+						log.Printf("Failed to mark notification %d as read for user %s: %v", id, s.UserID, err)
+					}
+				}
 			}
 		}(sub)
 	}
 
 	wg.Wait()
-	log.Printf("Broadcast sent to %d subscribers", len(subscribers))
+	log.Printf("Notification persisted and broadcast attempted to %d subscribers", len(subscribers))
 	return nil
 }
 

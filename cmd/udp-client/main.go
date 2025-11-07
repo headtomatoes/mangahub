@@ -126,11 +126,8 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				_, _ = conn.Write([]byte(`{"type":"PING","user_id":"` + auth.UserID + `"}`))
-			}
+		for range ticker.C {
+			_, _ = conn.Write([]byte(`{"type":"PING","user_id":"` + auth.UserID + `"}`))
 		}
 	}()
 

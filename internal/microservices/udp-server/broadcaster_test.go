@@ -57,6 +57,33 @@ func (m *mockNotificationRepo) MarkAllAsRead(ctx context.Context, userID string)
 	return nil
 }
 
+// mockUserRepo implements the user repository interface used by broadcaster tests
+type mockUserRepo struct {
+	ids []string
+	err error
+}
+
+func (m *mockUserRepo) GetAllIDs(ctx context.Context) ([]string, error) {
+	return m.ids, m.err
+}
+
+// Implement other UserRepository methods as no-ops for tests
+func (m *mockUserRepo) Create(user *models.User) error {
+	return nil
+}
+
+func (m *mockUserRepo) FindByUsername(username string) (*models.User, error) {
+	return nil, nil
+}
+
+func (m *mockUserRepo) FindByID(id string) (*models.User, error) {
+	return nil, nil
+}
+
+func (m *mockUserRepo) FindByEmail(email string) (*models.User, error) {
+	return nil, nil
+}
+
 func TestBroadcaster_BroadcastToAll(t *testing.T) {
 	// Create a UDP connection for testing
 	addr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:0")
@@ -74,7 +101,8 @@ func TestBroadcaster_BroadcastToAll(t *testing.T) {
 	// Create broadcaster
 	mockLibRepo := &mockLibraryRepo{}
 	mockNotifRepo := &mockNotificationRepo{}
-	broadcaster := NewBroadcaster(conn, subManager, mockLibRepo, mockNotifRepo)
+	mockUserRepo := &mockUserRepo{ids: []string{"user1"}}
+	broadcaster := NewBroadcaster(conn, subManager, mockLibRepo, mockNotifRepo, mockUserRepo)
 
 	// Test broadcast
 	notification := NewMangaNotification(123, "Test Manga")
@@ -110,7 +138,8 @@ func TestBroadcaster_BroadcastToLibraryUsers(t *testing.T) {
 	}
 
 	// Create broadcaster
-	broadcaster := NewBroadcaster(conn, subManager, mockLibRepo, mockNotifRepo)
+	mockUserRepo := &mockUserRepo{ids: []string{"user1", "user2", "user3"}}
+	broadcaster := NewBroadcaster(conn, subManager, mockLibRepo, mockNotifRepo, mockUserRepo)
 
 	// Test broadcast
 	ctx := context.Background()
@@ -156,7 +185,8 @@ func TestBroadcaster_BroadcastToLibraryUsers_NoUsers(t *testing.T) {
 		notifications: make([]*models.Notification, 0),
 	}
 
-	broadcaster := NewBroadcaster(conn, subManager, mockLibRepo, mockNotifRepo)
+	mockUserRepo := &mockUserRepo{ids: []string{}}
+	broadcaster := NewBroadcaster(conn, subManager, mockLibRepo, mockNotifRepo, mockUserRepo)
 
 	// Test broadcast
 	ctx := context.Background()
