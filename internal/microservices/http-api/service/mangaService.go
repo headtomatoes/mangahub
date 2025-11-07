@@ -142,9 +142,10 @@ func notifyNewManga(mangaID int64, title string) {
 func notifyMangaUpdate(mangaID int64, title string) {
 	url := os.Getenv("UDP_TRIGGER_URL")
 	if url == "" {
-		url = "http://udp-server:8085/notify/new-manga"
+		// call the dedicated manga-update trigger in the UDP server
+		url = "http://udp-server:8085/notify/manga-update"
 	}
-	payload := map[string]interface{}{"manga_id": mangaID, "title": title}
+	payload := map[string]interface{}{"manga_id": mangaID, "title": title, "message": "Manga updated"}
 	b, _ := json.Marshal(payload)
 	_, _ = http.Post(url, "application/json", bytes.NewReader(b))
 }

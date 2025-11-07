@@ -93,6 +93,38 @@ func main() {
 			w.WriteHeader(http.StatusAccepted)
 		})
 
+		// manga update (generic update) -> notify only library users
+		mux.HandleFunc("/notify/manga-update", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			var payload struct {
+				MangaID int64  `json:"manga_id"`
+				Title   string `json:"title"`
+				Message string `json:"message"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			// build a MANGA_UPDATE notification and broadcast to library users (stores unread)
+			notif := &udp.Notification{
+				Type:      udp.NotificationMangaUpdate,
+				MangaID:   payload.MangaID,
+				Title:     payload.Title,
+				Message:   payload.Message,
+				Timestamp: time.Now(),
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := server.GetBroadcaster().BroadcastToLibraryUsers(ctx, payload.MangaID, notif); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+		})
+
 		addr := ":" + httpPort
 		log.Printf("HTTP trigger for UDP server listening on %s", addr)
 		if err := http.ListenAndServe(addr, mux); err != nil {
