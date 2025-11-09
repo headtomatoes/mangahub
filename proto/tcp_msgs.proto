@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package tcp;
+
+option go_package = "internal/microservices/tcp/proto/tcp_msgs";
+
+// Base message wrapper (like your current Message struct)
+message TCPMessage {
+    MessageType type = 1;   // indicates which type of message it is
+    oneof payload {         // only one of these will be set
+        ProgressUpdate progress_update = 2;
+        AuthRequest auth_request = 3;
+        SystemMessage system_message = 4;
+        ErrorResponse error_response = 5;
+    }
+    int64 timestamp = 6;   // message timestamp
+} 
+
+// list of message types
+enum MessageType {
+    MESSAGE_TYPE_UNSPECIFIED = 0;
+    MESSAGE_TYPE_PROGRESS_UPDATE = 1;
+    MESSAGE_TYPE_AUTH_REQUEST = 2;
+    MESSAGE_TYPE_SYSTEM = 3;
+    MESSAGE_TYPE_ERROR = 4;
+}
+
+// tracking reading progress
+message ProgressUpdate {
+    string user_id = 1;
+    string manga_id = 2;
+    int32 chapter_number = 3;
+    //int32 page_number = 4; if needed in future
+    int64 timestamp = 4;
+    ProgressStatus status = 5;
+}
+
+enum ProgressStatus {
+    PROGRESS_STATUS_UNSPECIFIED = 0;
+    PROGRESS_STATUS_READING = 1;
+    PROGRESS_STATUS_COMPLETED = 2;
+    PROGRESS_STATUS_ON_HOLD = 3;
+}
+
+// Authentication
+message AuthRequest {
+    string token = 1;
+    string device_id = 2;
+}
+
+// System messages
+message SystemMessage {
+    string message = 1;
+    SystemMessageLevel level = 2;
+}
+
+enum SystemMessageLevel {
+    SYSTEM_MESSAGE_LEVEL_UNSPECIFIED = 0;
+    SYSTEM_MESSAGE_LEVEL_INFO = 1;
+    SYSTEM_MESSAGE_LEVEL_WARNING = 2;
+    SYSTEM_MESSAGE_LEVEL_ERROR = 3;
+}
+
+// Error responses
+message ErrorResponse {
+    string message = 1;
+    int32 code = 2;
+}

@@ -52,7 +52,7 @@ func main() {
 	}
 
 	// Auto-migrate manga model (safe for dev; careful in prod)
-	if err := gdb.AutoMigrate(&models.Manga{}, &models.Genre{}, &models.MangaGenre{}); err != nil {
+	if err := gdb.AutoMigrate(&models.Manga{}, &models.Genre{}, &models.MangaGenre{}, &models.UserProgress{}); err != nil {
 		// don't crash the whole server for migration issues while testing connectivity
 		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
@@ -73,6 +73,11 @@ func main() {
 	authSvc := svc.NewAuthService(userRepo, refreshToken, cfg)
 	authHandler := h.NewAuthHandler(authSvc)
 
+	// ---progress repo/service/handler---
+	progressRepo := repo.NewProgressRepository(gdb)
+	progressSvc := svc.NewProgressService(progressRepo)
+	progressHandler := h.NewProgressHandler(progressSvc)
+
 	// Gin setup
 	r := gin.New()
 	r.Use(gin.Logger())
@@ -90,6 +95,7 @@ func main() {
 	api.Use(mid.AuthMiddleware(authSvc))
 	mangaHandler.RegisterRoutes(api.Group("/manga"))
 	genreHandler.RegisterRoutes(api.Group("/genres"))
+	progressHandler.RegisterRoutes(api.Group("/progress"))
 
 	// Health/readiness
 	r.GET("/check-conn", func(c *gin.Context) {
