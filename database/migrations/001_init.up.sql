@@ -15,6 +15,9 @@ DROP TABLE IF EXISTS genres CASCADE;
 DROP TABLE IF EXISTS manga CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
+DROP TABLE IF EXISTS user_library CASCADE;
+
+
 -- ========================================
 -- USERS
 -- ========================================
@@ -68,13 +71,14 @@ CREATE TABLE manga_genres (
 -- USER PROGRESS
 -- ========================================
 CREATE TABLE user_progress (
-    id BIGSERIAL PRIMARY KEY,
+    -- id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
     current_chapter INTEGER DEFAULT 0,
     status TEXT CHECK(status IN ('reading', 'completed', 'plan_to_read', 'dropped')),
-    rating INTEGER CHECK(rating >= 1 AND rating <= 10),
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    page INTEGER DEFAULT 0,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, manga_id)
 );
 
 -- ========================================
@@ -91,13 +95,13 @@ CREATE TABLE chat_messages (
 -- ========================================
 -- USER SESSIONS
 -- ========================================
-CREATE TABLE user_sessions (
-    id BIGSERIAL PRIMARY KEY,
-    token TEXT UNIQUE NOT NULL,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
+-- CREATE TABLE user_sessions (
+--     id BIGSERIAL PRIMARY KEY,
+--     token TEXT UNIQUE NOT NULL,
+--     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--     expires_at TIMESTAMPTZ NOT NULL,
+--     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+-- );
 
 -- ========================================
 -- REFRESH TOKENS
@@ -135,3 +139,32 @@ CREATE TABLE ratings (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, manga_id)
 );
+
+-- ========================================
+-- USER LIBRARY
+-- ========================================
+CREATE TABLE user_library (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
+    added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, manga_id)
+);
+
+CREATE INDEX idx_user_library_user_id ON user_library(user_id);
+CREATE INDEX idx_user_library_manga_id ON user_library(manga_id);
+
+CREATE TABLE notifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    manga_id BIGINT REFERENCES manga(id) ON DELETE CASCADE,
+    title TEXT,
+    message TEXT NOT NULL,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_read ON notifications(read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);

@@ -1,0 +1,43 @@
+
+for api-server container checking:
+
+# stop and remove containers + anonymous volumes (safe to re-run)
+docker compose down -v
+
+# rebuild api-server and start db + api-server
+docker compose up --build -d db api-server
+
+# follow api-server logs
+docker compose logs -f api-server
+
+# check that api-server sees the DATABASE_URL env
+docker compose exec api-server sh -c 'env | grep DATABASE_URL || true'
+
+# quick DNS check from api-server (ping may not be available; use getent if present)
+docker compose exec api-server sh -c 'ping -c 1 db || getent hosts db || echo "name resolution failed"'
+
+# test endpoints (assuming HTTP_PORT=8084 mapped)
+curl -v http://localhost:8084/check-conn
+curl -v http://localhost:8084/db-ping
+
+
+
+// after any changes in code: we need to rebuild and run docker again:
+docker compose build api-server
+docker compose up -d api-server
+
+
+# stop and remove the db service container
+docker compose stop db
+docker compose rm -f db
+
+# rebuild image and start db (detached)
+docker compose build db
+docker compose up -d db
+
+docker-compose restart api-server
+
+
+go run ./cmd/udp-client
+go build ./cmd/udp-server && go build ./cmd/api-server
+

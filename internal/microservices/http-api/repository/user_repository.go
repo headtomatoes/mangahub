@@ -1,7 +1,7 @@
 package repository
 
 import (
-	//"context"
+	"context"
 	"mangahub/internal/microservices/http-api/models"
 
 	"gorm.io/gorm"
@@ -14,6 +14,8 @@ type UserRepository interface {
 	FindByUsername(username string) (*models.User, error)
 	FindByID(id string) (*models.User, error)
 	FindByEmail(email string) (*models.User, error)
+	// GetAllIDs returns all user IDs in the system
+	GetAllIDs(ctx context.Context) ([]string, error)
 }
 
 // userRepository is the GORM implementation of UserRepository.
@@ -57,4 +59,13 @@ func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// GetAllIDs returns all user IDs in the users table
+func (r *userRepository) GetAllIDs(ctx context.Context) ([]string, error) {
+	var ids []string
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
