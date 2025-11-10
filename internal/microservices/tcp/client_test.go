@@ -27,7 +27,7 @@ func RunTestClient() {
 		// send the progress update message
 		msg := Message{
 			Type: "progress_update",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"user":           "test_user",
 				"manga_id":       mangaID,
 				"chapter_number": chapter,

@@ -117,27 +117,31 @@ func (r *ProgressRedisRepo) GetUserProgress(userID string) ([]*ProgressData, err
 		// No-op for testing/mock mode - return empty list
 		return []*ProgressData{}, nil
 	}
+
+	ctx, cancel := context.WithTimeout(r.ctx, 10*time.Second)
+	defer cancel()
+
 	pattern := fmt.Sprintf("progress:user:%s:manga:*", userID)
 	var results []*ProgressData
 	var cursor uint64
 
 	for {
 		// SCAN returns keys in batches without blocking
-		keys, nextCursor, err := r.client.Scan(r.ctx, cursor, pattern, 100).Result()
+		keys, nextCursor, err := r.client.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return nil, err
 		}
 
 		for _, key := range keys {
 			// Use HGetAll here if using hashes
-			fields, err := r.client.HGetAll(r.ctx, key).Result()
+			fields, err := r.client.HGetAll(ctx, key).Result()
 			if err != nil {
 				continue
 			}
 			// Parse fields into ProgressData...
 			mangaID, err := strconv.ParseInt(fields["manga_id"], 10, 64)
 			if err != nil {
-				fmt.Errorf("invalid manga_id in redis for key %s: %v", key, err)
+				fmt.Printf("invalid manga_id in redis for key %s: %v", key, err)
 				continue
 			}
 			data := &ProgressData{
