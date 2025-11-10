@@ -1,26 +1,52 @@
 syntax = "proto3";
 
-package manga;
+package pb;
 
-option go_package = "github.com/headtotmatoes/mangahub/proto;manga";
+option go_package = "github.com/headtomatoes/mangahub/proto/pb";
 
-// Manga and Chapter data structures(demo purposes)
-message Manga {
-    string id = 1;
-    string title = 2;
-    string author = 3;
-    string description = 4;
-    repeated string genres = 5;
-    string cover_image_url = 6;
-    string status = 7; // e.g., "Ongoing", "Completed"
-    int32 total_chapters = 8;
+// all of these is are temporary and will be modified later
+// Manga represents a manga
+message Manga { // move manga between each service 
+
 }
 
-message Chapter {
-    string id = 1;
-    string manga_id = 2;
-    string title = 3;
-    int32 chapter_number = 4;
-    string release_date = 5; // ISO 8601 format
-    repeated string page_image_urls = 6;
+// SearchRequest for searching manga
+message SearchRequest { 
+}
+
+// SearchResponse returns search results
+message SearchResponse {
+
+}
+
+// GetMangaRequest
+message GetMangaRequest {
+
+}
+
+// GetMangaResponse
+message GetMangaResponse {
+
+}
+
+// UpdateProgressRequest
+message UpdateProgressRequest {
+
+}
+
+// UpdateProgressResponse
+message UpdateProgressResponse {
+
+}
+
+// MangaService defines RPC methods
+service MangaService {
+    // Get manga details
+    rpc GetManga(GetMangaRequest) returns (GetMangaResponse);
+    
+    // Search manga
+    rpc SearchManga(SearchRequest) returns (SearchResponse);
+    
+    // Update user progress (called internally)
+    rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
 }
