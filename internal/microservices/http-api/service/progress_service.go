@@ -1,70 +1,59 @@
 package service
 
 import (
-    "context"
-    "errors"
-    "mangahub/internal/microservices/http-api/models"
-    "mangahub/internal/microservices/http-api/repository"
-    "time"
+	"context"
+	"errors"
+	"mangahub/internal/microservices/http-api/models"
+	"mangahub/internal/microservices/http-api/repository"
 )
 
-type ProgressService interface {
-    Update(ctx context.Context, userID string, mangaID int64, currentChapter, page int, status string) error
-    Get(ctx context.Context, userID string, mangaID int64) (*models.UserProgress, error)
-    GetByUser(ctx context.Context, userID string) ([]models.UserProgress, error)
-}
+var (
+	ErrProgressNotFound       = errors.New("progress not found")
+	ErrFailedToUpdateProgress = errors.New("failed to update progress")
+	ErrFailedToGetAllProgress = errors.New("failed to get all progress")
+	ErrFailedToGetProgress    = errors.New("failed to get progress")
+	ErrFailedToDeleteProgress = errors.New("failed to delete progress")
+)
 
 type progressService struct {
-    repo      repository.ProgressRepository
-    mangaRepo *repository.MangaRepo
+	progressRepo repository.ProgressRepository
 }
 
-func NewProgressService(repo repository.ProgressRepository, mangaRepo *repository.MangaRepo) ProgressService {
-    return &progressService{
-        repo:      repo,
-        mangaRepo: mangaRepo,
-    }
+type ProgressService interface {
+	GetAllProgress(ctx context.Context, userID string) (*[]models.UserProgress, error)
+	GetProgressByMangaID(ctx context.Context, userID string, mangaID int64) (*models.UserProgress, error)
+	UpdateProgress(ctx context.Context, progress *models.UserProgress) error
+	DeleteProgress(ctx context.Context, userID string, mangaID int64) error
 }
 
-func (s *progressService) Update(ctx context.Context, userID string, mangaID int64, currentChapter, page int, status string) error {
-    // Validate manga exists
-    manga, err := s.mangaRepo.GetByID(ctx, mangaID)
-    if err != nil {
-        return errors.New("manga not found")
-    }
-    
-    // Validate chapter number
-    if manga.TotalChapters != nil && currentChapter > *manga.TotalChapters {
-        return errors.New("chapter number exceeds total chapters")
-    }
-    
-    // Validate status
-    validStatuses := map[string]bool{
-        "reading":       true,
-        "completed":     true,
-        "plan_to_read":  true,
-        "dropped":       true,
-    }
-    if status != "" && !validStatuses[status] {
-        return errors.New("invalid status")
-    }
-    
-    progress := &models.UserProgress{
-        UserID:         userID,
-        MangaID:        mangaID,
-        CurrentChapter: currentChapter,
-        Page:           page,
-        Status:         status,
-        UpdatedAt:      time.Now(),
-    }
-    
-    return s.repo.Update(ctx, progress)
+func NewProgressService(progressRepo repository.ProgressRepository) ProgressService {
+	return &progressService{progressRepo: progressRepo}
 }
 
-func (s *progressService) Get(ctx context.Context, userID string, mangaID int64) (*models.UserProgress, error) {
-    return s.repo.Get(ctx, userID, mangaID)
+func (s *progressService) GetAllProgress(ctx context.Context, userID string) (*[]models.UserProgress, error) {
+	progressList, err := s.progressRepo.GetAllProgress(ctx, userID)
+	if err != nil {
+		return nil, ErrFailedToGetAllProgress
+	}
+	return progressList, nil
 }
 
-func (s *progressService) GetByUser(ctx context.Context, userID string) ([]models.UserProgress, error) {
-    return s.repo.GetByUser(ctx, userID)
+func (s *progressService) GetProgressByMangaID(ctx context.Context, userID string, mangaID int64) (*models.UserProgress, error) {
+	progress, err := s.progressRepo.GetProgressByMangaID(ctx, userID, mangaID)
+	if err != nil {
+		return nil, ErrFailedToGetProgress
+	}
+	return progress, nil
+}
+func (s *progressService) UpdateProgress(ctx context.Context, progress *models.UserProgress) error {
+	if err := s.progressRepo.UpdateProgress(ctx, progress); err != nil {
+		return ErrFailedToUpdateProgress
+	}
+	return nil
+}
+func (s *progressService) DeleteProgress(ctx context.Context, userID string, mangaID int64) error {
+	if err := s.progressRepo.DeleteProgress(ctx, userID, mangaID); err != nil {
+		return ErrFailedToDeleteProgress
+	}
+	return nil
 }

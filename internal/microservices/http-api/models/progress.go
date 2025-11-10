@@ -2,19 +2,12 @@ package models
 
 import "time"
 
+// UserProgress represents the progress of a user reading a manga.
 type UserProgress struct {
-    UserID         string    `gorm:"type:uuid;primaryKey" json:"user_id"`
-    MangaID        int64     `gorm:"primaryKey" json:"manga_id"`
-    CurrentChapter int       `gorm:"default:0" json:"current_chapter"`
-    Status         string    `gorm:"type:text;check:status IN ('reading','completed','plan_to_read','dropped')" json:"status"`
-    Page           int       `gorm:"default:0" json:"page"`
-    UpdatedAt      time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
-    
-    // Associations
-    User  *User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
-    Manga *Manga `gorm:"foreignKey:MangaID" json:"manga,omitempty"`
-}
-
-func (UserProgress) TableName() string {
-    return "user_progress"
+	ID             int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID         string    `gorm:"type:uuid;not null;index:idx_user_manga" json:"user_id"`
+	MangaID        int64     `gorm:"not null;index:idx_user_manga" json:"manga_id"`
+	CurrentChapter int       `gorm:"default:0" json:"current_chapter"`
+	Status         string    `gorm:"type:text" json:"status"`
+	UpdatedAt      time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"updated_at"`
 }

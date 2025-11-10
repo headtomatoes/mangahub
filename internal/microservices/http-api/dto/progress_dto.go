@@ -1,19 +1,29 @@
 package dto
 
-import "time"
+// DTOs for progress-related operations in HTTP API
 
-// UpdateProgressRequest: payload to update reading progress
-type UpdateProgressRequest struct {
-    CurrentChapter int    `json:"current_chapter" binding:"min=0"`
-    Page           int    `json:"page" binding:"min=0"`
-    Status         string `json:"status" binding:"omitempty,oneof=reading completed plan_to_read dropped"`
+type GetProgressByMangaIDRequest struct {
+	UserID  string `json:"user_id" binding:"required,uuid"`
+	MangaID int64  `json:"manga_id" binding:"required,gt=0"`
 }
 
-// ProgressResponse: response for reading progress
+type UpdateProgressRequest struct {
+	UserID  string `json:"user_id" binding:"required,uuid"`
+	MangaID int64  `json:"manga_id" binding:"required,gt=0"`
+	Chapter int    `json:"chapter" binding:"required,min=0"`
+	Status  string `json:"status" binding:"required,oneof=reading completed on-hold dropped plan-to-read"`
+}
+
+type DeleteProgressRequest struct {
+	UserID  string `json:"user_id" binding:"required,uuid"`
+	MangaID int64  `json:"manga_id" binding:"required,uuid"`
+}
+
 type ProgressResponse struct {
-    MangaID        int64     `json:"manga_id"`
-    CurrentChapter int       `json:"current_chapter"`
-    Page           int       `json:"page"`
-    Status         string    `json:"status"`
-    UpdatedAt      time.Time `json:"updated_at"`
+	UserID    string `json:"user_id"`
+	MangaID   int64  `json:"manga_id"`
+	Chapter   int    `json:"chapter"`
+	Status    string `json:"status"`
+	UpdatedAt string `json:"updated_at"`
+	CreatedAt string `json:"created_at"`
 }

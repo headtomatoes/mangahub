@@ -87,14 +87,18 @@ func main() {
 	libraryHandler := h.NewLibraryHandler(librarySvc)
 
 	// progress setup
-	progressRepo := repo.NewProgressRepository(gdb)
-	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
-	progressHandler := h.NewProgressHandler(progressSvc)
+// 	progressRepo := repo.NewProgressRepository(gdb)
+// 	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
+// 	progressHandler := h.NewProgressHandler(progressSvc)
 
 	// notification setup
     notificationRepo := repo.NewNotificationRepository(gdb)
     notificationSvc := svc.NewNotificationService(notificationRepo)
     notificationHandler := h.NewNotificationHandler(notificationSvc)
+  	// ---progress repo/service/handler---
+  progressRepo := repo.NewProgressRepository(gdb)
+	progressSvc := svc.NewProgressService(progressRepo)
+	progressHandler := h.NewProgressHandler(progressSvc)
 
 	// Gin setup
 	r := gin.New()
@@ -116,9 +120,9 @@ func main() {
 		mangaHandler.RegisterRoutes(api.Group("/manga"))
 		genreHandler.RegisterRoutes(api.Group("/genres"))
 		libraryHandler.RegisterRoutes(api.Group("/library"))
-		progressHandler.RegisterRoutes(api.Group("/progress"))
+    progressHandler.RegisterRoutes(api.Group("/progress"))
 		notificationHandler.RegisterRoutes(api.Group("/notifications")) // Add this
-
+    
 	}
 
 	// Health/readiness
