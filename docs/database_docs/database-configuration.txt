@@ -15,3 +15,12 @@ docker exec -it mangahub_db psql -U mangahub -d mangahub -c "TRUNCATE TABLE mang
 # copy/execute migration file into container via stdin
 docker exec -i mangahub_db psql -U mangahub -d mangahub < database/migrations/001_init.up.sql
 docker exec -i mangahub_db psql -U mangahub -d mangahub < database/migrations/002_seed_data.sql
+
+# One-liner truncate
+docker compose exec db psql -U mangahub -d mangahub -c "
+BEGIN;
+TRUNCATE TABLE manga_genres RESTART IDENTITY CASCADE;
+TRUNCATE TABLE manga RESTART IDENTITY CASCADE;
+TRUNCATE TABLE genres RESTART IDENTITY CASCADE;
+COMMIT;
+"
