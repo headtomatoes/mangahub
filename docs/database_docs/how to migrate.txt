@@ -1,0 +1,8 @@
+# Scrape 500 manga with author data (parallel, ~4 seconds)
+make scrape
+
+# Import to database
+make import
+
+# Or both
+make scrape-and-import
