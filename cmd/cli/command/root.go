@@ -56,6 +56,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&apiURL, "api", "http://localhost:8084", "API server URL")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "$HOME/.mangahub/config.json", "config file path")
 
+	// Add subcommands
+	rootCmd.AddCommand(authCmd)
+
 	// loadConfig() for now is load token from config file
 	loadConfig()
 }
@@ -63,4 +66,5 @@ func init() {
 func loadConfig() {
 	// Placeholder function to load jwt token from config file
 	// implement actual file reading and parsing later
+	// TODO: Read token from config file and set it to the global token variable
 }

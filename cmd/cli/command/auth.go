@@ -23,15 +23,16 @@ var registerCmd = &cobra.Command{
 	Short: "Register a new MangaHub account",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// get data from flags
-		username, _ := cmd.Flags().GetString("username")
-		password, _ := cmd.Flags().GetString("password")
-		email, _ := cmd.Flags().GetString("email")
+		var c client.RegisterRequest
+		c.Username, _ = cmd.Flags().GetString("username")
+		c.Password, _ = cmd.Flags().GetString("password")
+		c.Email, _ = cmd.Flags().GetString("email")
 
 		// call API to register user
 		htppClient := client.NewHTTPClient(apiURL) // create new HTTP client
-		response, err := htppClient.Register(username, password, email)
+		response, err := htppClient.Register(&c)
 		if err != nil {
-			return fmt.Errorf("Registration process failed: %w", err)
+			return fmt.Errorf("registration process failed: %w", err)
 		}
 
 		// return confirmation message
@@ -47,14 +48,15 @@ var loginCmd = &cobra.Command{
 	Short: "Login to your MangaHub account",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// get data from flags
-		username, _ := cmd.Flags().GetString("username")
-		password, _ := cmd.Flags().GetString("password")
+		var c client.LoginRequest
+		c.Username, _ = cmd.Flags().GetString("username")
+		c.Password, _ = cmd.Flags().GetString("password")
 
 		// call API to login user
 		htppClient := client.NewHTTPClient(apiURL) // create new HTTP client
-		response, err := htppClient.Login(username, password)
+		response, err := htppClient.Login(&c)
 		if err != nil {
-			return fmt.Errorf("Login process failed: %w", err)
+			return fmt.Errorf("login process failed: %w", err)
 		}
 
 		// save token to config
@@ -105,4 +107,13 @@ func init() {
 }
 
 // saveToken saves the authentication token to config file || implement later
-func saveToken(accessToken, refreshToken string) {}
+func saveToken(accessToken, refreshToken string) {
+	// TODO: Implement token persistence
+	// For now, store in global variable
+	token = accessToken
+	fmt.Printf("Access Token: %s\n", accessToken)
+	if refreshToken != "" {
+		fmt.Printf("Refresh Token: %s\n", refreshToken)
+	}
+	// Future: Save to ~/.mangahub/config.json
+}
