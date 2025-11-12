@@ -7,37 +7,40 @@ option go_package = "github.com/headtomatoes/mangahub/proto/pb";
 // all of these is are temporary and will be modified later
 // Manga represents a manga
 message Manga { // move manga between each service 
-
+    int64 id = 1;
+    string title = 2;
+    string description = 3;
+    repeated string authors = 4;
+    repeated string genres = 5;
+    string cover_url = 6;
+    int32 chapters_count = 7;
 }
 
 // SearchRequest for searching manga
 message SearchRequest { 
+    string query = 1;
+    int32 limit = 2;
+    int32 offset = 3;
 }
 
 // SearchResponse returns search results
 message SearchResponse {
-
+    repeated Manga mangas = 1;
+    int64 total_count = 2;
 }
 
 // GetMangaRequest
 message GetMangaRequest {
-
+    int64 manga_id = 1;
 }
+
 
 // GetMangaResponse
 message GetMangaResponse {
-
+    Manga manga = 1;
 }
 
-// UpdateProgressRequest
-message UpdateProgressRequest {
 
-}
-
-// UpdateProgressResponse
-message UpdateProgressResponse {
-
-}
 
 // MangaService defines RPC methods
 service MangaService {
@@ -48,5 +51,5 @@ service MangaService {
     rpc SearchManga(SearchRequest) returns (SearchResponse);
     
     // Update user progress (called internally)
-    rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
+    // rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
 }

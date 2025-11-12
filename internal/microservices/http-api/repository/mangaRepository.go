@@ -14,6 +14,11 @@ type MangaRepo struct {
 	db *gorm.DB
 }
 
+// type MangaRepo interface {
+//     GetByID(ctx context.Context, id int64) (*models.Manga, error)
+//     Search(ctx context.Context, query string, limit, offset int) ([]*models.Manga, int64, error) // returns items, totalCount, error
+// }
+
 func NewMangaRepo(db *gorm.DB) *MangaRepo {
 	return &MangaRepo{db: db}
 }
