@@ -34,7 +34,8 @@ var registerCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("registration process failed: %w", err)
 		}
-
+		// save token to config
+		saveToken(response.AccessToken, response.RefreshToken)
 		// return confirmation message
 		fmt.Println("✓ Registration successful! Please login to continue.")
 		fmt.Printf("UserID: %s\n", response.UserID)

@@ -30,15 +30,12 @@ type RegisterRequest struct {
 }
 
 // response structure for HTTP client
-type LoginResponse struct {
+type AuthResponse struct {
 	AccessToken  string
 	RefreshToken string
 	UserID       string
 	Username     string
 	ExpiresIn    int64
-}
-type RegisterResponse struct {
-	UserID string
 }
 
 // constructor for HTTP client
@@ -57,7 +54,7 @@ func (c *HTTPClient) SetToken(token string) {
 }
 
 // login method for HTTP client
-func (c *HTTPClient) Login(request *LoginRequest) (*LoginResponse, error) {
+func (c *HTTPClient) Login(request *LoginRequest) (*AuthResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -74,7 +71,7 @@ func (c *HTTPClient) Login(request *LoginRequest) (*LoginResponse, error) {
 		return nil, fmt.Errorf("login failed with status: %s", response.Status)
 	}
 
-	var result LoginResponse
+	var result AuthResponse
 
 	// if decoding the response fails, return error
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
@@ -84,7 +81,7 @@ func (c *HTTPClient) Login(request *LoginRequest) (*LoginResponse, error) {
 }
 
 // register method for HTTP client
-func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, error) {
+func (c *HTTPClient) Register(request *RegisterRequest) (*AuthResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -101,7 +98,7 @@ func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, erro
 		return nil, fmt.Errorf("registration failed with status: %s", response.Status)
 	}
 
-	var result RegisterResponse
+	var result AuthResponse
 
 	// if decoding the response fails, return error
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
