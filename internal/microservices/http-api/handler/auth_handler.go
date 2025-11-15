@@ -71,14 +71,16 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	newAccessToken, err := h.authService.RefreshAccessToken(req.RefreshToken)
+	newAccessToken, newRefreshToken, err := h.authService.RefreshAccessToken(req.RefreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token": newAccessToken,
-		"expires_in":   900,
+	c.JSON(http.StatusOK, dto.RefreshResponse{
+		RefreshToken: newRefreshToken,
+		AccessToken:  newAccessToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    900, // 15 minutes in seconds
 	})
 }

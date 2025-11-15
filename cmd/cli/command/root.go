@@ -6,15 +6,12 @@ package command
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	apiURL  string //Global flag for API server URL
-	cfgFile string // config file path
-	token   string //
+	apiURL string //Global flag for API server URL
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -54,33 +51,12 @@ func init() {
 	// }
 
 	// Global persistent flags = available to all subcommands
-	rootCmd.PersistentFlags().StringVar(&apiURL, "api", "http://localhost:8084", "API server URL")
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "C:\\Project\\Go\\mangahub\\cmd\\cli\\config.json", "config file path")
-
+	defaultURL := "https://localhost:8084"
+	if v := os.Getenv("MANGAHUB_API_URL"); v != "" {
+		defaultURL = v
+	}
+	apiURL = defaultURL
+	rootCmd.PersistentFlags().StringVar(&apiURL, "api-url", defaultURL, "MangaHub API server URL (can also be set via MANGAHUB_API_URL environment variable)")
 	// Add subcommands
 	rootCmd.AddCommand(authCmd)
-
-	// loadConfig() for now is load token from config file
-	err := loadConfig()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error loading config:", err)
-		os.Exit(1)
-	}
-}
-
-func loadConfig() error {
-	// Placeholder function to load jwt token from config file
-	// implement actual file reading and parsing later
-	// TODO: Read token from config file and set it to the global token variable
-	// read from cfgFile path
-
-	file, err := os.ReadFile(cfgFile)
-	if err != nil {
-		// If config file not found, return error
-		fmt.Errorf("config file not found: %w", err)
-	}
-	// get token from file content
-	token = strings.TrimSpace(string(file))
-
-	return nil
 }

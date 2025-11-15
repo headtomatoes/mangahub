@@ -86,15 +86,11 @@ func main() {
 	librarySvc := svc.NewLibraryService(libraryRepo, mangaRepo)
 	libraryHandler := h.NewLibraryHandler(librarySvc)
 
-	// progress setup
-	// 	progressRepo := repo.NewProgressRepository(gdb)
-	// 	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
-	// 	progressHandler := h.NewProgressHandler(progressSvc)
-
 	// notification setup
 	notificationRepo := repo.NewNotificationRepository(gdb)
 	notificationSvc := svc.NewNotificationService(notificationRepo)
 	notificationHandler := h.NewNotificationHandler(notificationSvc)
+
 	// ---progress repo/service/handler---
 	progressRepo := repo.NewProgressRepository(gdb)
 	progressSvc := svc.NewProgressService(progressRepo)
@@ -146,8 +142,8 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// HTTP server with graceful shutdown
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.HTTPPort)
+
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      r,
@@ -156,11 +152,18 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server
+	// Start HTTPS server in a goroutine
 	go func() {
-		log.Printf("🚀 server listening on %s", addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server ListenAndServe error: %v", err)
+		if cfg.TLSEnabled {
+			log.Printf("🚀 server listening on https://%s", addr)
+			if err := srv.ListenAndServeTLS(cfg.TLSCertPath, cfg.TLSKeyPath); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server ListenAndServeTLS error: %v", err)
+			}
+		} else {
+			log.Printf("🚀 server listening on http://%s", addr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server ListenAndServe error: %v", err)
+			}
 		}
 	}()
 

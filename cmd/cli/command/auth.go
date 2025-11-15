@@ -2,7 +2,9 @@ package command
 
 import (
 	"fmt"
+	"mangahub/cmd/cli/authentication"
 	"mangahub/cmd/cli/command/client"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -60,7 +62,7 @@ var loginCmd = &cobra.Command{
 		}
 
 		// save token to config
-		saveToken(response.AccessToken, response.RefreshToken)
+		saveToken(response.AccessToken, response.RefreshToken, response.Username, response.ExpiresIn)
 
 		// return confirmation message
 		fmt.Println("✓ Successfully logged in!")
@@ -74,7 +76,7 @@ var logoutCmd = &cobra.Command{
 	Short: "Logout from your MangaHub account",
 	Run: func(cmd *cobra.Command, args []string) {
 		// clear token from config
-		saveToken("", "")
+		saveToken("", "", "", 0)
 		fmt.Println("✓ Successfully logged out.")
 	},
 }
@@ -106,14 +108,19 @@ func init() {
 	logoutCmd.Flags() // no flags for logout
 }
 
-// saveToken saves the authentication token to config file || implement later
-func saveToken(accessToken, refreshToken string) {
-	// TODO: Implement token persistence
-	// For now, store in global variable
-	token = accessToken
-	fmt.Printf("Access Token: %s\n", accessToken)
-	if refreshToken != "" {
-		fmt.Printf("Refresh Token: %s\n", refreshToken)
+// saveToken saves the authentication token to config file
+func saveToken(accessToken, refreshToken, username string, expiresInSeconds int64) error {
+	creds := &authentication.StoredCredentials{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Username:     username,
+		ExpiresAt:    time.Now().Add(time.Duration(expiresInSeconds) * time.Second).Unix(),
 	}
-	// Future: Save to ~/.mangahub/config.json
+
+	if err := authentication.StoreTokens(creds); err != nil {
+		return fmt.Errorf("failed to store tokens: %w", err)
+	}
+
+	fmt.Println("✓ Successfully logged in!")
+	return nil
 }

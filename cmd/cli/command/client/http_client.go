@@ -42,6 +42,17 @@ type RegisterResponse struct {
 	Message  string
 }
 
+type RefreshTokenRequest struct {
+	RefreshToken string
+}
+
+type RefreshResponse struct {
+	AccessToken  string
+	RefreshToken string
+	TokenType    string
+	ExpiresIn    int64
+}
+
 // constructor for HTTP client
 func NewHTTPClient(apiURL string) *HTTPClient {
 	return &HTTPClient{
@@ -107,6 +118,32 @@ func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, erro
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
 		return nil, err
 	}
+	return &result, nil
+}
+
+// refresh token method for HTTP client
+func (c *HTTPClient) RefreshToken(request *RefreshTokenRequest) (*RefreshResponse, error) {
+	body := map[string]string{"refresh_token": request.RefreshToken} // prepare request body
+	jsonData, err := json.Marshal(body)                              // marshal to JSON
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.httpClient.Post(c.baseURL+"/auth/refresh", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("refresh failed: %s", resp.Status)
+	}
+
+	var result RefreshResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
 	return &result, nil
 }
 

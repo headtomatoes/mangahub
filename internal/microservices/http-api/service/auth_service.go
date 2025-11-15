@@ -25,7 +25,7 @@ var (
 type AuthService interface {
 	Register(username, password, email string) (*models.User, error)
 	Login(username, password string) (accessToken, refreshToken string, user *models.User, err error)
-	RefreshAccessToken(refreshToken string) (newAccessToken string, err error)
+	RefreshAccessToken(refreshToken string) (newAccessToken, newRefreshToken string, err error)
 	ValidateToken(tokenString string) (*jwt.Token, error)
 }
 
@@ -241,42 +241,48 @@ func (s *authService) generateRefreshToken(user *models.User) (string, error) {
 	return refreshToken.Token, nil
 }
 
-func (s *authService) RefreshAccessToken(refreshTokenString string) (string, error) {
+func (s *authService) RefreshAccessToken(refreshTokenString string) (string, string, error) {
 	// Validate refresh token
 	refreshToken, err := s.refreshTokenRepo.FindByToken(refreshTokenString)
 	if err != nil {
-		return "", errors.New("invalid refresh token")
+		return "", "", errors.New("invalid refresh token")
 	}
 
 	// Check expiration
 	if time.Now().After(refreshToken.ExpiresAt) {
 		s.refreshTokenRepo.Delete(refreshToken.ID)
-		return "", errors.New("refresh token expired")
+		return "", "", errors.New("refresh token expired")
 	}
 
 	// Check if revoked
 	if refreshToken.Revoked {
 		s.refreshTokenRepo.Delete(refreshToken.ID)
-		return "", errors.New("refresh token revoked")
+		return "", "", errors.New("refresh token revoked")
 	}
 
 	// Get user
 	user, err := s.userRepo.FindByID(refreshToken.UserID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// Rotate refresh token
 	// Invalidate the old refresh token
 	if err := s.refreshTokenRepo.Revoke(refreshToken.ID); err != nil {
-		return "", err
+		s.refreshTokenRepo.Delete(refreshToken.ID)
+		return "", "", err
+	}
+	// Issue a new access token
+	newAccessToken, err := s.generateAccessTokenWithScopes(user)
+	if err != nil {
+		return "", "", err
 	}
 	// Issue a new refresh token
-	_, err = s.generateRefreshToken(user)
+	newRefreshToken, err := s.generateRefreshToken(user)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// Generate new access token
-	return s.generateAccessTokenWithScopes(user)
+	return newAccessToken, newRefreshToken, nil
 }
 
 func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
