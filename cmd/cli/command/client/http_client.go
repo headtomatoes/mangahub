@@ -37,6 +37,10 @@ type AuthResponse struct {
 	Username     string
 	ExpiresIn    int64
 }
+type RegisterResponse struct {
+	Username string
+	Message  string
+}
 
 // constructor for HTTP client
 func NewHTTPClient(apiURL string) *HTTPClient {
@@ -81,7 +85,7 @@ func (c *HTTPClient) Login(request *LoginRequest) (*AuthResponse, error) {
 }
 
 // register method for HTTP client
-func (c *HTTPClient) Register(request *RegisterRequest) (*AuthResponse, error) {
+func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -98,8 +102,7 @@ func (c *HTTPClient) Register(request *RegisterRequest) (*AuthResponse, error) {
 		return nil, fmt.Errorf("registration failed with status: %s", response.Status)
 	}
 
-	var result AuthResponse
-
+	var result RegisterResponse
 	// if decoding the response fails, return error
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
 		return nil, err

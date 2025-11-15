@@ -87,16 +87,16 @@ func main() {
 	libraryHandler := h.NewLibraryHandler(librarySvc)
 
 	// progress setup
-// 	progressRepo := repo.NewProgressRepository(gdb)
-// 	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
-// 	progressHandler := h.NewProgressHandler(progressSvc)
+	// 	progressRepo := repo.NewProgressRepository(gdb)
+	// 	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
+	// 	progressHandler := h.NewProgressHandler(progressSvc)
 
 	// notification setup
-    notificationRepo := repo.NewNotificationRepository(gdb)
-    notificationSvc := svc.NewNotificationService(notificationRepo)
-    notificationHandler := h.NewNotificationHandler(notificationSvc)
-  	// ---progress repo/service/handler---
-  progressRepo := repo.NewProgressRepository(gdb)
+	notificationRepo := repo.NewNotificationRepository(gdb)
+	notificationSvc := svc.NewNotificationService(notificationRepo)
+	notificationHandler := h.NewNotificationHandler(notificationSvc)
+	// ---progress repo/service/handler---
+	progressRepo := repo.NewProgressRepository(gdb)
 	progressSvc := svc.NewProgressService(progressRepo)
 	progressHandler := h.NewProgressHandler(progressSvc)
 
@@ -117,12 +117,12 @@ func main() {
 	api := r.Group("/api")
 	api.Use(mid.AuthMiddleware(authSvc))
 	{
-		mangaHandler.RegisterRoutes(api.Group("/manga"))
+		mangaHandler.RegisterRoutes(api.Group("/manga")) // newly added the scopes based middleware in handler | other handlers follow same pattern later
 		genreHandler.RegisterRoutes(api.Group("/genres"))
 		libraryHandler.RegisterRoutes(api.Group("/library"))
-    progressHandler.RegisterRoutes(api.Group("/progress"))
+		progressHandler.RegisterRoutes(api.Group("/progress"))
 		notificationHandler.RegisterRoutes(api.Group("/notifications")) // Add this
-    
+
 	}
 
 	// Health/readiness
