@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
+// AuthMiddleware is a Gin middleware for JWT authentication of API requests
+// It checks for the presence and validity of a JWT token in the Authorization header
 func AuthMiddleware(authService service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get token from header
-		authHeader := c.GetHeader("Authorization")
+		authHeader := c.GetHeader("Authorization") // extract the Authorization header
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
 			c.Abort()
@@ -20,7 +21,7 @@ func AuthMiddleware(authService service.AuthService) gin.HandlerFunc {
 		}
 
 		// Extract token (format: "Bearer <token>")
-		parts := strings.Split(authHeader, " ")
+		parts := strings.Split(authHeader, " ") // split by space , 0 is Bearer, 1 is token
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
 			c.Abort()
@@ -37,8 +38,8 @@ func AuthMiddleware(authService service.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		// Extract claims
-		claims, ok := token.Claims.(jwt.MapClaims)
+		// Extract claims from token
+		claims, ok := token.Claims.(*service.Claims)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 			c.Abort()
@@ -46,9 +47,111 @@ func AuthMiddleware(authService service.AuthService) gin.HandlerFunc {
 		}
 
 		// Set user info in context for handlers to use
-		c.Set("user_id", claims["user_id"])
-		c.Set("username", claims["username"])
+		c.Set("claims", claims)
+		c.Set("userID", claims.UserID)
+		c.Set("email", claims.Email)
+		c.Set("scopes", claims.Scopes)
+		c.Set("role", claims.Role)
 
 		c.Next()
+	}
+}
+
+// All under here are scope-related middlewares use in route protection
+// RequireScopes middleware checks if token has required scopes
+func RequireScopes(requiredScopes ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get scopes from context (set by AuthMiddleware)
+		scopesInterface, exists := c.Get("scopes")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Scopes not found in token"})
+			c.Abort()
+			return
+		}
+
+		tokenScopes, ok := scopesInterface.([]string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid scope format"})
+			c.Abort()
+			return
+		}
+
+		// Check if token has all required scopes
+		if !hasAllScopes(tokenScopes, requiredScopes) {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":    "Insufficient scopes",
+				"required": requiredScopes,
+				"granted":  tokenScopes,
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// hasAllScopes checks if token has all required scopes
+func hasAllScopes(tokenScopes, requiredScopes []string) bool {
+	// Create a map for efficient lookup rather than nested loops
+	scopeMap := make(map[string]bool)
+	for _, scope := range tokenScopes {
+		scopeMap[scope] = true
+	}
+
+	// Check for wildcard admin scope
+	if scopeMap["*"] || scopeMap["admin:*"] {
+		return true
+	}
+
+	// Check each required scope
+	for _, required := range requiredScopes {
+		if !scopeMap[required] {
+			// Check for wildcard matches (e.g., "read:*" for "read:products")
+			if !matchesWildcardScope(tokenScopes, required) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// matchesWildcardScope handles wildcard scope matching
+func matchesWildcardScope(tokenScopes []string, required string) bool {
+	for _, scope := range tokenScopes {
+		if len(scope) > 0 && scope[len(scope)-1] == '*' {
+			prefix := scope[:len(scope)-1]
+			if strings.HasPrefix(required, prefix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// RequireAnyScope checks if token has ANY of the specified scopes
+func RequireAnyScope(scopes ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scopesInterface, exists := c.Get("scopes")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Scopes not found"})
+			c.Abort()
+			return
+		}
+
+		tokenScopes := scopesInterface.([]string)
+
+		for _, required := range scopes {
+			for _, granted := range tokenScopes {
+				if granted == required {
+					c.Next()
+					return
+				}
+			}
+		}
+
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient scopes"})
+		c.Abort()
 	}
 }
