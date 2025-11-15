@@ -61,11 +61,51 @@ var loginCmd = &cobra.Command{
 			return fmt.Errorf("login process failed: %w", err)
 		}
 
-		// save token to config
-		saveToken(response.AccessToken, response.RefreshToken, response.Username, response.ExpiresIn)
+		// store tokens in keyring
+		now := time.Now().Unix()
+		err = authentication.StoreTokens(&authentication.StoredCredentials{
+			AccessToken:  response.AccessToken,
+			RefreshToken: response.RefreshToken,
+			Username:     c.Username,
+			ExpiresAt:    now + response.ExpiresIn,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to store tokens: %w", err)
+		}
 
 		// return confirmation message
 		fmt.Println("✓ Successfully logged in!")
+		return nil
+	},
+}
+
+var autologinCmd = &cobra.Command{
+	Use:   "autologin",
+	Short: "Automatically login using stored credentials",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// check if token is on the keyring already
+		creds, err := authentication.GetTokens()
+		if err != nil {
+			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
+		}
+		httpClient := client.NewHTTPClient(apiURL) // create new HTTP client
+		req := &client.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
+		// if token is expired, refresh it
+		now := time.Now().Unix()
+		if now >= creds.ExpiresAt {
+			refreshResp, err := httpClient.RefreshToken(req)
+			if err != nil {
+				return fmt.Errorf("session expired, please login again: %w", err)
+			}
+
+			// if refresh successful, store new tokens
+			_ = authentication.StoreTokens(&authentication.StoredCredentials{
+				AccessToken:  refreshResp.AccessToken,
+				RefreshToken: refreshResp.RefreshToken,
+				Username:     creds.Username,
+				ExpiresAt:    now + refreshResp.ExpiresIn,
+			})
+		}
 		return nil
 	},
 }
@@ -76,7 +116,12 @@ var logoutCmd = &cobra.Command{
 	Short: "Logout from your MangaHub account",
 	Run: func(cmd *cobra.Command, args []string) {
 		// clear token from config
-		saveToken("", "", "", 0)
+		err := authentication.DeleteTokens()
+		if err != nil {
+			fmt.Printf("✗ Logout failed: %v\n", err)
+			return
+		}
+		// return confirmation message
 		fmt.Println("✓ Successfully logged out.")
 	},
 }
@@ -89,6 +134,7 @@ func init() {
 	authCmd.AddCommand(registerCmd)
 	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(logoutCmd)
+	authCmd.AddCommand(autologinCmd)
 
 	// add flags for register command
 	registerCmd.Flags().StringP("username", "u", "", "Username for the new account")
@@ -106,21 +152,4 @@ func init() {
 
 	// add flags for logout command
 	logoutCmd.Flags() // no flags for logout
-}
-
-// saveToken saves the authentication token to config file
-func saveToken(accessToken, refreshToken, username string, expiresInSeconds int64) error {
-	creds := &authentication.StoredCredentials{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		Username:     username,
-		ExpiresAt:    time.Now().Add(time.Duration(expiresInSeconds) * time.Second).Unix(),
-	}
-
-	if err := authentication.StoreTokens(creds); err != nil {
-		return fmt.Errorf("failed to store tokens: %w", err)
-	}
-
-	fmt.Println("✓ Successfully logged in!")
-	return nil
 }
