@@ -53,6 +53,14 @@ type RefreshResponse struct {
 	ExpiresIn    int64
 }
 
+type RevokeTokenRequest struct {
+	RefreshToken string
+}
+
+type RevokeTokenResponse struct {
+	Message string
+}
+
 // constructor for HTTP client
 func NewHTTPClient(apiURL string) *HTTPClient {
 	return &HTTPClient{
@@ -144,6 +152,29 @@ func (c *HTTPClient) RefreshToken(request *RefreshTokenRequest) (*RefreshRespons
 		return nil, err
 	}
 
+	return &result, nil
+}
+
+// revoke token method for HTTP client
+func (c *HTTPClient) RevokeToken(request *RevokeTokenRequest) (*RevokeTokenResponse, error) {
+	body := map[string]string{"refresh_token": request.RefreshToken}
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Post(c.baseURL+"/auth/revoke", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("revoke failed: %s", resp.Status)
+	}
+	var result RevokeTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
 	return &result, nil
 }
 

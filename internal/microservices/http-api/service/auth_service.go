@@ -3,6 +3,7 @@ package service
 // upgrade to OAUTH2.1
 import (
 	"errors"
+	"fmt"
 	"mangahub/internal/config"
 	"mangahub/internal/microservices/http-api/models"
 	"mangahub/internal/microservices/http-api/repository"
@@ -27,6 +28,7 @@ type AuthService interface {
 	Login(username, password string) (accessToken, refreshToken string, user *models.User, err error)
 	RefreshAccessToken(refreshToken string) (newAccessToken, newRefreshToken string, err error)
 	ValidateToken(tokenString string) (*jwt.Token, error)
+	RevokeToken(refreshToken string) error
 }
 
 type authService struct {
@@ -302,4 +304,21 @@ func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
 	}
 
 	return token, nil
+}
+
+func (s *authService) RevokeToken(refreshTokenString string) error {
+	// Validate refresh token
+	refreshToken, err := s.refreshTokenRepo.FindByToken(refreshTokenString)
+	if err != nil {
+		fmt.Println("Error finding refresh token:", err)
+		return nil // return nil to ignore leakage of token validity
+	}
+	// Revoke the token
+	if err := s.refreshTokenRepo.Revoke(refreshToken.ID); err != nil {
+		fmt.Println("Error revoking refresh token:", err)
+		return nil // Ignore errors during revocation
+	}
+
+	fmt.Println("Refresh token revoked successfully")
+	return nil
 }

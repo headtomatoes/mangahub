@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"mangahub/internal/microservices/http-api/dto"
 	"mangahub/internal/microservices/http-api/service"
 	"net/http"
@@ -82,5 +83,23 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		AccessToken:  newAccessToken,
 		TokenType:    "Bearer",
 		ExpiresIn:    900, // 15 minutes in seconds
+	})
+}
+
+func (h *AuthHandler) RevokeToken(c *gin.Context) {
+	var req dto.RevokeTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.authService.RevokeToken(req.RefreshToken)
+	if err != nil {
+		fmt.Println("some error occurred:", err)
+	}
+
+	// always return success response to avoid token fishing
+	c.JSON(http.StatusOK, dto.RevokeTokenResponse{
+		Message: "Refresh token revoked successfully",
 	})
 }

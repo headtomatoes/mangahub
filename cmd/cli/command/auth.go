@@ -126,6 +126,35 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
+var revokeTokenCmd = &cobra.Command{
+	Use:   "revoke-token",
+	Short: "Revoke the stored refresh token",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// get stored credentials
+		creds, err := authentication.GetTokens()
+		if err != nil {
+			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
+		}
+		// call API to revoke refresh token
+		httpClient := client.NewHTTPClient(apiURL) // create new HTTP client
+		req := &client.RevokeTokenRequest{RefreshToken: creds.RefreshToken}
+		_, err = httpClient.RevokeToken(req)
+		if err != nil {
+			return fmt.Errorf("failed to revoke token: %w", err)
+		}
+
+		// clear token from config
+		err = authentication.DeleteTokens()
+		if err != nil {
+			return fmt.Errorf("failed to clear stored tokens: %w", err)
+		}
+
+		// return confirmation message
+		fmt.Println("✓ Refresh token revoked successfully.")
+		return nil
+	},
+}
+
 // tokenCmd represents the token management command || implement later
 
 // init function to add auth commands to root command
@@ -135,6 +164,7 @@ func init() {
 	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(logoutCmd)
 	authCmd.AddCommand(autologinCmd)
+	authCmd.AddCommand(revokeTokenCmd)
 
 	// add flags for register command
 	registerCmd.Flags().StringP("username", "u", "", "Username for the new account")

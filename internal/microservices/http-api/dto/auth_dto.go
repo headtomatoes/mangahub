@@ -44,6 +44,14 @@ type RegisterResponse struct {
 	Message  string `json:"message"`
 }
 
+type RevokeTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type RevokeTokenResponse struct {
+	Message string `json:"message"`
+}
+
 // OAuth2.1 DTOs
 // OAuthTokenRequest: payload for OAuth2.1 token request
 type OAuthTokenRequest struct {
