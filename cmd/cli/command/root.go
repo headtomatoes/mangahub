@@ -59,4 +59,5 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&apiURL, "api-url", defaultURL, "MangaHub API server URL (can also be set via MANGAHUB_API_URL environment variable)")
 	// Add subcommands
 	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(mangaCmd)
 }
