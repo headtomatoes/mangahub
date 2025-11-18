@@ -42,14 +42,6 @@ func Execute() {
 }
 
 func init() {
-	// Load configuration from file or environment variables || add later
-	// for now use hardcoded values
-	// cfg, err := loadConfig()
-	// if err != nil {
-	// 	fmt.Fprintln(os.Stderr, "Error loading config:", err)
-	// 	os.Exit(1)
-	// }
-
 	// Global persistent flags = available to all subcommands
 	defaultURL := "https://localhost:8084"
 	if v := os.Getenv("MANGAHUB_API_URL"); v != "" {
@@ -60,4 +52,5 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(mangaCmd)
+	rootCmd.AddCommand(libraryCmd) // Add this line
 }
