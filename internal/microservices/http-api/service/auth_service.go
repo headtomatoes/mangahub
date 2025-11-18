@@ -25,9 +25,9 @@ var (
 
 type AuthService interface {
 	Register(username, password, email string) (*models.User, error)
-	Login(username, password string) (accessToken, refreshToken string, user *models.User, err error)
+	Login(username, password, email string) (accessToken, refreshToken string, user *models.User, err error)
 	RefreshAccessToken(refreshToken string) (newAccessToken, newRefreshToken string, err error)
-	ValidateToken(tokenString string) (*jwt.Token, error)
+	ValidateToken(tokenString string) (*Claims, error)
 	RevokeToken(refreshToken string) error
 }
 
@@ -106,9 +106,15 @@ func (s *authService) Register(username, password, email string) (*models.User, 
 }
 
 // Login: authenticates a user and returns access and refresh tokens upon successful login.
-func (s *authService) Login(username, password string) (string, string, *models.User, error) {
+func (s *authService) Login(username, password, email string) (string, string, *models.User, error) {
 	// Find user
-	user, err := s.userRepo.FindByUsername(username)
+	var user *models.User
+	var err error
+	if username != "" {
+		user, err = s.userRepo.FindByUsername(username)
+	} else if email != "" {
+		user, err = s.userRepo.FindByEmail(email)
+	}
 	if err != nil {
 		// User not found we use dummy compare to mitigate timing attacks (always take same time)
 		_ = bcrypt.CompareHashAndPassword([]byte("$2a$10$7EqJtq98hPqEX7fNZaFWoOhi6Cq1h0u3b0j3Z6h5y5jY5f5h5F5eW"), []byte(password))
@@ -287,23 +293,44 @@ func (s *authService) RefreshAccessToken(refreshTokenString string) (string, str
 	return newAccessToken, newRefreshToken, nil
 }
 
-func (s *authService) ValidateToken(tokenString string) (*jwt.Token, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("invalid signing method")
-		}
-		return []byte(s.jwtSecret), nil
-	})
+func (s *authService) ValidateToken(tokenString string) (*Claims, error) {
+	// prepare empty claims struct for parsing(prevent panic)
+	claims := &Claims{}
+	// parse with claims
+	token, err := jwt.ParseWithClaims(tokenString, claims,
+		// take jwt.token and check signing method
+		func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("invalid signing method")
+			}
+			// if valid, return the secret key for validation
+			return []byte(s.jwtSecret), nil
+		})
 
+	// check for parsing errors / invalid signing method
 	if err != nil {
 		return nil, err
 	}
-
+	// check token validity
 	if !token.Valid {
-		return nil, errors.New("invalid token")
+		return nil, ErrInvalidToken
 	}
 
-	return token, nil
+	// check additional information in claims
+	// check expiration
+	if claims.ExpiresAt == nil || time.Now().After(claims.ExpiresAt.Time) {
+		return nil, ErrExpiredToken
+	}
+
+	// check issuer
+	if claims.Issuer != "mangahub" {
+		return nil, ErrInvalidToken
+	}
+	// check subject
+	if claims.Subject == "" {
+		return nil, ErrInvalidToken
+	}
+	return claims, nil
 }
 
 func (s *authService) RevokeToken(refreshTokenString string) error {

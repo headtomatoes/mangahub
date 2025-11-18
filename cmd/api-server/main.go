@@ -11,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"mangahub/database"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"mangahub/database"
 	// gormdb "mangahub/internal/db" // removed — use database.OpenGorm()
 	"mangahub/internal/config"
 	h "mangahub/internal/microservices/http-api/handler"
@@ -100,6 +102,16 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+
+	//CORS middlewar
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.CORSOrigins,                                     //["http://localhost:3000"] //frontend origin
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //allowed methods
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, //allowed headers
+		ExposeHeaders:    []string{"Content-Length"},                          //exposed headers
+		AllowCredentials: true,                                                //allow cookies, authorization headers with CORS requests
+		MaxAge:           12 * time.Hour,                                      //preflight request cache duration
+	}))
 
 	// Public routes
 	auth := r.Group("/auth")

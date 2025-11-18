@@ -31,17 +31,9 @@ func AuthMiddleware(authService service.AuthService) gin.HandlerFunc {
 		tokenString := parts[1]
 
 		// Validate token
-		token, err := authService.ValidateToken(tokenString)
+		claims, err := authService.ValidateToken(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			c.Abort()
-			return
-		}
-
-		// Extract claims from token
-		claims, ok := token.Claims.(*service.Claims)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 			c.Abort()
 			return
 		}

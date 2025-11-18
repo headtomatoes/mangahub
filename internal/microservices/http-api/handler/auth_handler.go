@@ -26,11 +26,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user, err := h.authService.Register(req.Username, req.Password, req.Email)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err == service.ErrNameInUse || err == service.ErrEmailInUse {
+		c.JSON(http.StatusConflict, gin.H{"error": "Account creation failed"})
 		return
 	}
-
 	c.JSON(http.StatusCreated, gin.H{
 		"user_id":  user.ID,
 		"username": user.Username,
@@ -46,7 +45,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, user, err := h.authService.Login(req.Username, req.Password)
+	accessToken, refreshToken, user, err := h.authService.Login(req.Username, req.Password, req.Email)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -62,8 +61,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 }
 
 // TODO: what is the best practice for refresh token response structure?
-// like when the AT is timed out, do we issue a new RT as well or just a new AT?
-// for now, we just issue a new AT
+// always return new RT along with new AT
+// rotate both tokens to enhance security
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req dto.RefreshTokenRequest
 

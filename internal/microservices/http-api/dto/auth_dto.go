@@ -11,8 +11,8 @@ type RegisterRequest struct {
 
 // LoginRequest: payload for user login
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Email    string `json:"email" binding:"required"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
 	Password string `json:"password" binding:"required"`
 }
 

@@ -12,6 +12,8 @@ import (
 // auth.go handles authentication commands for the mangahubCLI application.
 // auth login, register, logout, and token management commands will be implemented here.
 
+const refreshBuffer = 5 * 60 // 5 minutes in seconds
+
 // authCmd represents the auth command for authentication related subcommands
 var authCmd = &cobra.Command{
 	Use:   "auth",
@@ -92,7 +94,7 @@ var autologinCmd = &cobra.Command{
 		req := &client.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
 		// if token is expired, refresh it
 		now := time.Now().Unix()
-		if now >= creds.ExpiresAt {
+		if now >= (creds.ExpiresAt - refreshBuffer) {
 			refreshResp, err := httpClient.RefreshToken(req)
 			if err != nil {
 				return fmt.Errorf("session expired, please login again: %w", err)
