@@ -148,7 +148,7 @@ func (b *Broadcaster) BroadcastToAll(notification *Notification) error {
 			}
 		}(sub)
 	}
-
+    
 	wg.Wait()
 	log.Printf("Notification persisted and broadcast attempted to %d subscribers", len(subscribers))
 	return nil
