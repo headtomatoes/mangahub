@@ -103,7 +103,7 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	//CORS middlewar
+	// CORS middleware
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.CORSOrigins,                                     //["http://localhost:3000"] //frontend origin
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //allowed methods
