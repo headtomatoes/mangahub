@@ -40,16 +40,34 @@ func (h *MangaHandler) List(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
-	list, err := h.svc.GetAll(ctx)
+	// Parse pagination parameters
+	page := 1
+	pageSize := 20
+
+	if p := c.Query("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+
+	if ps := c.Query("page_size"); ps != "" {
+		if parsed, err := strconv.Atoi(ps); err == nil && parsed > 0 && parsed <= 100 {
+			pageSize = parsed
+		}
+	}
+
+	list, total, err := h.svc.GetAll(ctx, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	resp := make([]dto.MangaResponse, 0, len(list))
 	for _, m := range list {
 		resp = append(resp, dto.FromModelToResponse(m))
 	}
-	c.JSON(http.StatusOK, resp)
+
+	c.JSON(http.StatusOK, dto.NewPaginatedMangaResponse(resp, page, pageSize, total))
 }
 
 func (h *MangaHandler) Get(c *gin.Context) {

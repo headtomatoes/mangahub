@@ -23,12 +23,29 @@ func NewMangaRepo(db *gorm.DB) *MangaRepo {
 	return &MangaRepo{db: db}
 }
 
-func (r *MangaRepo) GetAll(ctx context.Context) ([]models.Manga, error) {
+func (r *MangaRepo) GetAll(ctx context.Context, page, pageSize int) ([]models.Manga, int64, error) {
 	var list []models.Manga
-	if err := r.db.WithContext(ctx).Preload("Genres").Order("created_at desc").Find(&list).Error; err != nil {
-		return nil, err
+	var total int64
+
+	// Count total records
+	if err := r.db.WithContext(ctx).Model(&models.Manga{}).Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
-	return list, nil
+
+	// Calculate offset
+	offset := (page - 1) * pageSize
+
+	// Fetch paginated results
+	if err := r.db.WithContext(ctx).
+		Preload("Genres").
+		Order("created_at desc").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&list).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return list, total, nil
 }
 
 func (r *MangaRepo) GetByID(ctx context.Context, id int64) (*models.Manga, error) {
