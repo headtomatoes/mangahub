@@ -56,7 +56,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		RefreshToken: refreshToken,
 		UserID:       user.ID,
 		Username:     user.Username,
-		ExpiresIn:    900, // 15 minutes in seconds
+		ExpiresIn:    9000, // 15 minutes in seconds
 	})
 }
 
