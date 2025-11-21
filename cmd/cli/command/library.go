@@ -2,8 +2,6 @@ package command
 
 import (
 	"fmt"
-	"mangahub/cmd/cli/authentication"
-	"mangahub/cmd/cli/command/client"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -26,14 +24,7 @@ var libraryAddCmd = &cobra.Command{
 			return
 		}
 
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			fmt.Println("Not logged in. Please login first.")
-			return
-		}
-
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		if err := httpClient.AddToLibrary(mangaID); err != nil {
 			fmt.Println("Failed to add manga to library:", err)
@@ -48,14 +39,7 @@ var libraryListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all manga in your library",
 	Run: func(cmd *cobra.Command, args []string) {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			fmt.Println("Not logged in. Please login first.")
-			return
-		}
-
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		library, err := httpClient.GetLibrary()
 		if err != nil {
@@ -95,14 +79,7 @@ var libraryRemoveCmd = &cobra.Command{
 			return
 		}
 
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			fmt.Println("Not logged in. Please login first.")
-			return
-		}
-
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		if err := httpClient.RemoveFromLibrary(mangaID); err != nil {
 			fmt.Println("Failed to remove manga from library:", err)

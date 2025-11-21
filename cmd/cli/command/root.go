@@ -5,13 +5,22 @@ package command
 
 import (
 	"fmt"
+	"mangahub/cmd/cli/authentication"
+	"mangahub/cmd/cli/command/client"
 	"os"
+
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
+const refreshBuffer = 5 * 60 // 5 minutes in seconds
+
 var (
-	apiURL string //Global flag for API server URL
+	apiURL           string                                                            //Global flag for API server URL
+	skipAuthCommands = map[string]bool{"auth": true, "help": true, "completion": true} // Commands that skip authentication
+	accessToken      string                                                            // Global variable to hold the access token for the session
+	currentUsername  string                                                            // Global variable to hold the current username
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -26,9 +35,59 @@ built for learning purpose and personal use. User can use this application to:
 - Join community discussions chat rooms
 
 Use "mangahubCLI command -help" or "mangahubCLI command -h" to see all available commands.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	// PersistentPreRun runs before every command except those in skipAuthCommands
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Skip authentication for auth commands and help
+		cmdName := cmd.Name() // get current command name e.g., "manga"
+		if cmd.Parent() != nil {
+			cmdName = cmd.Parent().Name()
+		}
+
+		if skipAuthCommands[cmdName] { // skip if command in the skip list
+			return nil
+		}
+
+		// Try to get stored credentials
+		creds, err := authentication.GetTokens()
+		if err != nil {
+			return fmt.Errorf("not logged in, please run 'mangahubCLI auth login' first")
+		}
+
+		// Check if token needs refresh
+		now := time.Now().Unix()
+		if now >= (creds.ExpiresAt - refreshBuffer) { // now >= expiry - buffer time
+			httpClient := client.NewHTTPClient(apiURL)
+			req := &client.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
+
+			refreshResp, err := httpClient.RefreshToken(req)
+			if err != nil {
+				// Clear invalid tokens
+				_ = authentication.DeleteTokens()
+				return fmt.Errorf("session expired, please login again: %w", err)
+			}
+
+			// Store refreshed tokens
+			err = authentication.StoreTokens(&authentication.StoredCredentials{
+				AccessToken:  refreshResp.AccessToken,
+				RefreshToken: refreshResp.RefreshToken,
+				Username:     creds.Username,
+				ExpiresAt:    now + refreshResp.ExpiresIn,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to store refreshed tokens: %w", err)
+			}
+
+			// Update global variables
+			accessToken = refreshResp.AccessToken
+			currentUsername = creds.Username
+		} else {
+			// Use existing valid token
+			accessToken = creds.AccessToken
+			currentUsername = creds.Username
+		}
+
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -43,14 +102,29 @@ func Execute() {
 
 func init() {
 	// Global persistent flags = available to all subcommands
-	defaultURL := "https://localhost:8084"
+	defaultURL := "http://localhost:8084"
 	if v := os.Getenv("MANGAHUB_API_URL"); v != "" {
 		defaultURL = v
 	}
 	apiURL = defaultURL
-	rootCmd.PersistentFlags().StringVar(&apiURL, "api-url", defaultURL, "MangaHub API server URL (can also be set via MANGAHUB_API_URL environment variable)")
+	rootCmd.PersistentFlags().StringVar(&apiURL, "api-url", defaultURL, "MangaHub API server URL")
 	// Add subcommands
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(mangaCmd)
-	rootCmd.AddCommand(libraryCmd) // Add this line
+	rootCmd.AddCommand(libraryCmd)
+}
+
+// GetAuthenticatedClient returns an HTTP client with the current access token
+// Helper for commands that need authentication
+func GetAuthenticatedClient() *client.HTTPClient {
+	httpClient := client.NewHTTPClient(apiURL)
+	if accessToken != "" {
+		httpClient.SetToken(accessToken)
+	}
+	return httpClient
+}
+
+// GetCurrentUsername returns the username of the currently logged-in user
+func GetCurrentUsername() string {
+	return currentUsername
 }
