@@ -284,7 +284,7 @@ Create `cmd/mangahub-cli/main.go`:
 package main
 
 import (
-    "mangahub/internal/cli/cmd"
+    "github.com/headtomatoes/mangahub/internal/cli/cmd"
     "os"
 )
 
@@ -496,7 +496,7 @@ var serverStartCmd = &cobra.Command{
         fmt.Println("🚀 Starting MangaHub services...")
         
         // Start HTTP-API server
-        apiCmd := exec.Command("mangahub/cmd/api-server/api-server")
+        apiCmd := exec.Command("github.com/headtomatoes/mangahub/cmd/api-server/api-server")
         if err := apiCmd.Start(); err != nil {
             fmt.Printf("❌ Failed to start HTTP-API: %v\n", err)
             return
@@ -504,7 +504,7 @@ var serverStartCmd = &cobra.Command{
         fmt.Println("✓ HTTP-API server started on port 8084")
         
         // Start TCP server
-        tcpCmd := exec.Command("mangahub/cmd/tcp-server/tcp-server")
+        tcpCmd := exec.Command("github.com/headtomatoes/mangahub/cmd/tcp-server/tcp-server")
         if err := tcpCmd.Start(); err != nil {
             fmt.Printf("❌ Failed to start TCP server: %v\n", err)
             return
@@ -529,7 +529,7 @@ import (
     "github.com/spf13/cobra"
     "github.com/spf13/viper"
     "golang.org/x/term"
-    "mangahub/internal/cli/client"
+    "github.com/headtomatoes/mangahub/internal/cli/client"
     "os"
     "syscall"
 )
@@ -610,7 +610,7 @@ import (
     "fmt"
     "github.com/spf13/cobra"
     "github.com/spf13/viper"
-    "mangahub/internal/cli/client"
+    "github.com/headtomatoes/mangahub/internal/cli/client"
     "strconv"
 )
 

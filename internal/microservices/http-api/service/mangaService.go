@@ -20,7 +20,7 @@ import (
 )
 
 type MangaService interface {
-	GetAll(ctx context.Context) ([]models.Manga, error)
+	GetAll(ctx context.Context, page, pageSize int) ([]models.Manga, int64, error)
 	GetByID(ctx context.Context, id int64) (*models.Manga, error)
 	Create(ctx context.Context, m *models.Manga) error
 	Update(ctx context.Context, id int64, m *models.Manga) error
@@ -43,8 +43,15 @@ func NewMangaService(r *repository.MangaRepo) MangaService {
 	return &mangaService{repo: r}
 }
 
-func (s *mangaService) GetAll(ctx context.Context) ([]models.Manga, error) {
-	return s.repo.GetAll(ctx)
+func (s *mangaService) GetAll(ctx context.Context, page, pageSize int) ([]models.Manga, int64, error) {
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	return s.repo.GetAll(ctx, page, pageSize)
 }
 
 func (s *mangaService) GetByID(ctx context.Context, id int64) (*models.Manga, error) {

@@ -36,7 +36,7 @@ func NewMangaNotification(mangaID int64, title string) *Notification {
 		Timestamp: time.Now(),
 	}
 }
-
+   
 // NewChapterNotification creates a notification for new chapter
 func NewChapterNotification(mangaID int64, title string, chapter int) *Notification {
 	return &Notification{
