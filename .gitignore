@@ -27,6 +27,13 @@ go.work
 .env
 .env.local
 .env.*.local
+.env.test
+.env.development
+.env.production
+
+# Keep examples
+!.env.example
+!.env.test.example
 
 # IDEs
 .idea/
