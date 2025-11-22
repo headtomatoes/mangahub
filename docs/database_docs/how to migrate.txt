@@ -6,3 +6,30 @@ make import
 
 # Or both
 make scrape-and-import
+
+- initialize the database image: docker compose up -d db
+
+- Check is it available or note: docker ps
+
+
+- work with database server: docker exec -it mangahub_db psql -U mangahub -d mangahub
+- run any SQl script
+- \dt for see all table 
+- \q: quit
+
+-- for empty data in specific table
+docker exec -it mangahub_db psql -U mangahub -d mangahub -c "TRUNCATE TABLE manga CASCADE;"
+
+
+# copy/execute migration file into container via stdin
+docker exec -i mangahub_db psql -U mangahub -d mangahub < database/migrations/001_init.up.sql
+docker exec -i mangahub_db psql -U mangahub -d mangahub < database/migrations/002_seed_data.sql
+
+# One-liner truncate
+docker compose exec db psql -U mangahub -d mangahub -c "
+BEGIN;
+TRUNCATE TABLE manga_genres RESTART IDENTITY CASCADE;
+TRUNCATE TABLE manga RESTART IDENTITY CASCADE;
+TRUNCATE TABLE genres RESTART IDENTITY CASCADE;
+COMMIT;
+"
