@@ -11,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"mangahub/database"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	"mangahub/database"
 	// gormdb "mangahub/internal/db" // removed — use database.OpenGorm()
 	"mangahub/internal/config"
 	h "mangahub/internal/microservices/http-api/handler"
@@ -86,17 +88,13 @@ func main() {
 	librarySvc := svc.NewLibraryService(libraryRepo, mangaRepo)
 	libraryHandler := h.NewLibraryHandler(librarySvc)
 
-	// progress setup
-// 	progressRepo := repo.NewProgressRepository(gdb)
-// 	progressSvc := svc.NewProgressService(progressRepo, mangaRepo)
-// 	progressHandler := h.NewProgressHandler(progressSvc)
-
 	// notification setup
-    notificationRepo := repo.NewNotificationRepository(gdb)
-    notificationSvc := svc.NewNotificationService(notificationRepo)
-    notificationHandler := h.NewNotificationHandler(notificationSvc)
-  	// ---progress repo/service/handler---
-  progressRepo := repo.NewProgressRepository(gdb)
+	notificationRepo := repo.NewNotificationRepository(gdb)
+	notificationSvc := svc.NewNotificationService(notificationRepo)
+	notificationHandler := h.NewNotificationHandler(notificationSvc)
+
+	// ---progress repo/service/handler---
+	progressRepo := repo.NewProgressRepository(gdb)
 	progressSvc := svc.NewProgressService(progressRepo)
 	progressHandler := h.NewProgressHandler(progressSvc)
 
@@ -105,24 +103,35 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
+	// CORS middleware
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.CORSOrigins,                                     //["http://localhost:3000"] //frontend origin
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, //allowed methods
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, //allowed headers
+		ExposeHeaders:    []string{"Content-Length"},                          //exposed headers
+		AllowCredentials: true,                                                //allow cookies, authorization headers with CORS requests
+		MaxAge:           12 * time.Hour,                                      //preflight request cache duration
+	}))
+
 	// Public routes
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/refresh", authHandler.RefreshToken)
+		auth.POST("/revoke", authHandler.RevokeToken)
 	}
 
 	// Protected routes
 	api := r.Group("/api")
 	api.Use(mid.AuthMiddleware(authSvc))
 	{
-		mangaHandler.RegisterRoutes(api.Group("/manga"))
+		mangaHandler.RegisterRoutes(api.Group("/manga")) // newly added the scopes based middleware in handler | other handlers follow same pattern later
 		genreHandler.RegisterRoutes(api.Group("/genres"))
 		libraryHandler.RegisterRoutes(api.Group("/library"))
-    progressHandler.RegisterRoutes(api.Group("/progress"))
+		progressHandler.RegisterRoutes(api.Group("/progress"))
 		notificationHandler.RegisterRoutes(api.Group("/notifications")) // Add this
-    
+
 	}
 
 	// Health/readiness
@@ -146,8 +155,8 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// HTTP server with graceful shutdown
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.HTTPPort)
+
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      r,
@@ -156,11 +165,18 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server
+	// Start HTTPS server in a goroutine
 	go func() {
-		log.Printf("🚀 server listening on %s", addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server ListenAndServe error: %v", err)
+		if cfg.TLSEnabled {
+			log.Printf("🚀 server listening on https://%s", addr)
+			if err := srv.ListenAndServeTLS(cfg.TLSCertPath, cfg.TLSKeyPath); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server ListenAndServeTLS error: %v", err)
+			}
+		} else {
+			log.Printf("🚀 server listening on http://%s", addr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server ListenAndServe error: %v", err)
+			}
 		}
 	}()
 

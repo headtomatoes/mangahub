@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./database/migrations/001_init.up.sql:/docker-entrypoint-initdb.d/001_init.sql
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mangahub"]
@@ -169,12 +169,29 @@ services:
       - mangahub-network
     profiles:
       - monitoring
-
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mangahub-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: trongle250504@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - mangahub-network
+    depends_on:
+      db:
+        condition: service_healthy
 volumes:
   postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:
+  pgadmin_data:
 
 networks:
   mangahub-network:

@@ -12,6 +12,7 @@ type RefreshTokenRepository interface {
 	FindByToken(tokenString string) (*models.RefreshToken, error)
 	Revoke(tokenID string) error
 	Delete(tokenID string) error
+	DeleteExpired() error
 }
 
 // refreshTokenRepository is the GORM implementation of RefreshTokenRepository
@@ -49,4 +50,10 @@ func (r *refreshTokenRepository) Revoke(tokenID string) error {
 // can be use with time-based cleanup of revoked tokens or triggered cleanup
 func (r *refreshTokenRepository) Delete(tokenID string) error {
 	return r.db.Where("id = ?", tokenID).Delete(&models.RefreshToken{}).Error
+}
+
+// DeleteExpired: removes all expired refresh tokens from the database
+// can be scheduled to run periodically to clean up old tokens(daily cron job?)
+func (r *refreshTokenRepository) DeleteExpired() error {
+	return r.db.Where("expires_at < ?", gorm.Expr("NOW()")).Delete(&models.RefreshToken{}).Error
 }

@@ -49,12 +49,17 @@ type Config struct {
 	// Development
 	LogLevel    string   `env:"LOG_LEVEL" default:"debug"`
 	LogFormat   string   `env:"LOG_FORMAT" default:"text"`
-	CORSOrigins []string `env:"CORS_ORIGINS" default:"http://localhost:3000,http://localhost:8080"`
+	CORSOrigins []string `env:"CORS_ORIGINS" default:"http://localhost:3000,http://localhost:8084"`
 
 	// File Storage
 	MangaDataPath string `env:"MANGA_DATA_PATH" default:"/app/data/manga"`
 	UserDataPath  string `env:"USER_DATA_PATH" default:"/app/data/users"`
 	UploadMaxSize string `env:"UPLOAD_MAX_SIZE" default:"10MB"`
+
+	// TLS
+	TLSEnabled  bool   `env:"TLS_ENABLED" default:"false"`
+	TLSCertPath string `env:"TLS_CERT_PATH" default:"./cert/localhost+2.pem"`
+	TLSKeyPath  string `env:"TLS_KEY_PATH" default:"./cert/localhost+2-key.pem"`
 }
 
 // LoadConfig loads configuration from environment variables
@@ -165,6 +170,16 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	// TLS
+	if err := loadEnvBool(&config.TLSEnabled, "TLS_ENABLED", false); err != nil {
+		return nil, err
+	}
+	if err := loadEnvString(&config.TLSCertPath, "TLS_CERT_PATH", "./cert/localhost+2.pem"); err != nil {
+		return nil, err
+	}
+	if err := loadEnvString(&config.TLSKeyPath, "TLS_KEY_PATH", "./cert/localhost+2-key.pem"); err != nil {
+		return nil, err
+	}
 	return config, nil
 }
 

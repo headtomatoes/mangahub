@@ -1,0 +1,11 @@
+# Rebuild
+go build -o mangahub ./cmd/cli
+
+# Logout first to clear any bad tokens
+./mangahub auth logout
+
+# Login again
+./mangahub auth login -u "manCity3" -p "mcfc1213"
+
+# Test manga list
+./mangahub manga list
