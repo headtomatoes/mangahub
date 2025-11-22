@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"mangahub/internal/microservices/http-api/dto"
 	"mangahub/internal/microservices/http-api/service"
 	"net/http"
@@ -25,11 +26,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user, err := h.authService.Register(req.Username, req.Password, req.Email)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err == service.ErrNameInUse || err == service.ErrEmailInUse {
+		c.JSON(http.StatusConflict, gin.H{"error": "Account creation failed"})
 		return
 	}
-
 	c.JSON(http.StatusCreated, gin.H{
 		"user_id":  user.ID,
 		"username": user.Username,
@@ -45,7 +45,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, user, err := h.authService.Login(req.Username, req.Password)
+	accessToken, refreshToken, user, err := h.authService.Login(req.Username, req.Password, req.Email)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -56,13 +56,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		RefreshToken: refreshToken,
 		UserID:       user.ID,
 		Username:     user.Username,
-		ExpiresIn:    900, // 15 minutes in seconds
+		ExpiresIn:    9000, // 15 minutes in seconds
 	})
 }
 
 // TODO: what is the best practice for refresh token response structure?
-// like when the AT is timed out, do we issue a new RT as well or just a new AT?
-// for now, we just issue a new AT
+// always return new RT along with new AT
+// rotate both tokens to enhance security
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req dto.RefreshTokenRequest
 
@@ -71,14 +71,34 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	newAccessToken, err := h.authService.RefreshAccessToken(req.RefreshToken)
+	newAccessToken, newRefreshToken, err := h.authService.RefreshAccessToken(req.RefreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token": newAccessToken,
-		"expires_in":   900,
+	c.JSON(http.StatusOK, dto.RefreshResponse{
+		RefreshToken: newRefreshToken,
+		AccessToken:  newAccessToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    900, // 15 minutes in seconds
+	})
+}
+
+func (h *AuthHandler) RevokeToken(c *gin.Context) {
+	var req dto.RevokeTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.authService.RevokeToken(req.RefreshToken)
+	if err != nil {
+		fmt.Println("some error occurred:", err)
+	}
+
+	// always return success response to avoid token fishing
+	c.JSON(http.StatusOK, dto.RevokeTokenResponse{
+		Message: "Refresh token revoked successfully",
 	})
 }

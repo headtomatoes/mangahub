@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"mangahub/internal/microservices/http-api/dto"
+	"mangahub/internal/microservices/http-api/middleware"
 	"mangahub/internal/microservices/http-api/models"
 	"mangahub/internal/microservices/http-api/service"
 
@@ -23,17 +24,17 @@ func NewMangaHandler(svc service.MangaService) *MangaHandler {
 }
 
 func (h *MangaHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.GET("/", h.List)
-	rg.GET("/search", h.SearchByTitle) // new route (supports ?q= or ?title=)
-	rg.GET("/:id", h.Get)
-	rg.POST("/", h.Create)
-	rg.PUT("/:id", h.Update)
-	rg.DELETE("/:id", h.Delete)
+	rg.GET("/", middleware.RequireScopes("read:manga"), h.List)
+	rg.GET("/search", middleware.RequireScopes("read:manga"), h.SearchByTitle) // new route (supports ?q= or ?title=)
+	rg.GET("/:id", middleware.RequireScopes("read:manga"), h.Get)
+	rg.POST("/", middleware.RequireScopes("read:manga", "write:manga"), h.Create)
+	rg.PUT("/:id", middleware.RequireScopes("read:manga", "write:manga"), h.Update)
+	rg.DELETE("/:id", middleware.RequireScopes("delete:manga"), h.Delete)
 
 	// genres for a manga
-	rg.GET("/:id/genres", h.GetMangaGenres)
-	rg.POST("/:id/genres", h.AddMangaGenres)
-	rg.DELETE("/:id/genres", h.RemoveMangaGenres)
+	rg.GET("/:id/genres", middleware.RequireScopes("read:manga"), h.GetMangaGenres)
+	rg.POST("/:id/genres", middleware.RequireScopes("read:manga", "write:manga"), h.AddMangaGenres)
+	rg.DELETE("/:id/genres", middleware.RequireScopes("delete:manga"), h.RemoveMangaGenres)
 }
 
 func (h *MangaHandler) List(c *gin.Context) {
