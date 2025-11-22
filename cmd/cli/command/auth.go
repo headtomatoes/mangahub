@@ -12,8 +12,6 @@ import (
 // auth.go handles authentication commands for the mangahubCLI application.
 // auth login, register, logout, and token management commands will be implemented here.
 
-const refreshBuffer = 5 * 60 // 5 minutes in seconds
-
 // authCmd represents the auth command for authentication related subcommands
 var authCmd = &cobra.Command{
 	Use:   "auth",

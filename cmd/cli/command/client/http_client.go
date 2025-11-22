@@ -20,45 +20,45 @@ type HTTPClient struct {
 
 // request structure for HTTP client
 type LoginRequest struct {
-	Username string
-	Password string
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 type RegisterRequest struct {
-	Username string
-	Password string
-	Email    string
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
 // response structure for HTTP client
 type AuthResponse struct {
-	AccessToken  string
-	RefreshToken string
-	UserID       string
-	Username     string
-	ExpiresIn    int64
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	UserID       string `json:"user_id"`
+	Username     string `json:"username"`
+	ExpiresIn    int64  `json:"expires_in"`
 }
 type RegisterResponse struct {
-	Username string
-	Message  string
+	Username string `json:"username"`
+	Message  string `json:"message"`
 }
 
 type RefreshTokenRequest struct {
-	RefreshToken string
+	RefreshToken string `json:"refresh_token"`
 }
 
 type RefreshResponse struct {
-	AccessToken  string
-	RefreshToken string
-	TokenType    string
-	ExpiresIn    int64
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
 }
 
 type RevokeTokenRequest struct {
-	RefreshToken string
+	RefreshToken string `json:"refresh_token"`
 }
 
 type RevokeTokenResponse struct {
-	Message string
+	Message string `json:"message"`
 }
 
 // Struct for mangas and genres:
@@ -194,21 +194,25 @@ func (c *HTTPClient) RefreshToken(request *RefreshTokenRequest) (*RefreshRespons
 	body := map[string]string{"refresh_token": request.RefreshToken} // prepare request body
 	jsonData, err := json.Marshal(body)                              // marshal to JSON
 	if err != nil {
+		fmt.Println("Failed to marshal refresh token request:", err)
 		return nil, err
 	}
 
 	resp, err := c.httpClient.Post(c.baseURL+"/auth/refresh", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
+		fmt.Println("Failed to send refresh token request:", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Refresh token request failed with status:", resp.Status)
 		return nil, fmt.Errorf("refresh failed: %s", resp.Status)
 	}
 
 	var result RefreshResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		fmt.Println("Failed to decode refresh token response:", err)
 		return nil, err
 	}
 

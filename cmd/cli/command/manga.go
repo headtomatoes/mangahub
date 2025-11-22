@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"mangahub/cmd/cli/authentication"
 	"mangahub/cmd/cli/command/client"
 	"strconv"
 	"strings"
@@ -20,13 +19,7 @@ var listMangaCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all manga",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		mangas, err := httpClient.GetAllManga()
 		if err != nil {
@@ -62,18 +55,12 @@ var getMangaCmd = &cobra.Command{
 	Short: "Get manga by ID",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		id, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid manga ID: %w", err)
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		manga, err := httpClient.GetMangaByID(id)
 		if err != nil {
@@ -113,15 +100,9 @@ var searchMangaCmd = &cobra.Command{
 	Short: "Search manga by title, author, or slug",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		query := strings.Join(args, " ")
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		mangas, err := httpClient.SearchManga(query)
 		if err != nil {
@@ -153,11 +134,6 @@ var createMangaCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new manga",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		title, _ := cmd.Flags().GetString("title")
 		author, _ := cmd.Flags().GetString("author")
 		status, _ := cmd.Flags().GetString("status")
@@ -189,8 +165,7 @@ var createMangaCmd = &cobra.Command{
 			request.Slug = &slug
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		manga, err := httpClient.CreateManga(request)
 		if err != nil {
@@ -213,11 +188,6 @@ var updateMangaCmd = &cobra.Command{
 	Short: "Update an existing manga",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		id, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid manga ID: %w", err)
@@ -255,8 +225,7 @@ var updateMangaCmd = &cobra.Command{
 			request.Slug = &slug
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		manga, err := httpClient.UpdateManga(id, request)
 		if err != nil {
@@ -276,18 +245,12 @@ var deleteMangaCmd = &cobra.Command{
 	Short: "Delete a manga",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		id, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid manga ID: %w", err)
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		err = httpClient.DeleteManga(id)
 		if err != nil {
@@ -304,18 +267,12 @@ var genresCmd = &cobra.Command{
 	Short: "Get genres for a manga",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		id, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid manga ID: %w", err)
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		genres, err := httpClient.GetMangaGenres(id)
 		if err != nil {
@@ -341,11 +298,6 @@ var addGenresCmd = &cobra.Command{
 	Short: "Add genres to a manga",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		mangaID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid manga ID: %w", err)
@@ -360,8 +312,7 @@ var addGenresCmd = &cobra.Command{
 			genreIDs = append(genreIDs, gID)
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		err = httpClient.AddMangaGenres(mangaID, genreIDs)
 		if err != nil {
@@ -378,11 +329,6 @@ var removeGenresCmd = &cobra.Command{
 	Short: "Remove genres from a manga",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		creds, err := authentication.GetTokens()
-		if err != nil {
-			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
-		}
-
 		mangaID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			return fmt.Errorf("invalid manga ID: %w", err)
@@ -397,8 +343,7 @@ var removeGenresCmd = &cobra.Command{
 			genreIDs = append(genreIDs, gID)
 		}
 
-		httpClient := client.NewHTTPClient(apiURL)
-		httpClient.SetToken(creds.AccessToken)
+		httpClient := GetAuthenticatedClient()
 
 		err = httpClient.RemoveMangaGenres(mangaID, genreIDs)
 		if err != nil {
