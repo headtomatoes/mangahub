@@ -44,6 +44,9 @@ help:
 	@echo "  fmt                  Format Go code"
 	@echo "  clean                Clean build artifacts"
 	@echo "  install-tools        Install development tools"
+	@echo "  scrape               Scrape data from MangaDex API"
+	@echo "  import               Import scraped data to database"
+	@echo "  scrape-and-import    Scrape and import data in one command"
 	@echo ""
 
 ## install-tools: Install development tools
@@ -60,28 +63,28 @@ build: build-api build-tcp build-udp build-grpc
 ## build-api: Build API server
 build-api:
 	@echo "Building API server..."
-	@if not exist $(BINARY_DIR) mkdir $(BINARY_DIR)
+	@mkdir -p $(BINARY_DIR)
 	go build -o $(API_BINARY) ./cmd/api-server
 	@echo "API server built: $(API_BINARY)"
 
 ## build-tcp: Build TCP server
 build-tcp:
 	@echo "Building TCP server..."
-	@if not exist $(BINARY_DIR) mkdir $(BINARY_DIR)
+	@mkdir -p $(BINARY_DIR)
 	go build -o $(TCP_BINARY) ./cmd/tcp-server
 	@echo "TCP server built: $(TCP_BINARY)"
 
 ## build-udp: Build UDP server
 build-udp:
 	@echo "Building UDP server..."
-	@if not exist $(BINARY_DIR) mkdir $(BINARY_DIR)
+	@mkdir -p $(BINARY_DIR)
 	go build -o $(UDP_BINARY) ./cmd/udp-server
 	@echo "UDP server built: $(UDP_BINARY)"
 
 ## build-grpc: Build gRPC server
 build-grpc:
 	@echo "Building gRPC server..."
-	@if not exist $(BINARY_DIR) mkdir $(BINARY_DIR)
+	@mkdir -p $(BINARY_DIR)
 	go build -o $(GRPC_BINARY) ./cmd/grpc-server
 	@echo "gRPC server built: $(GRPC_BINARY)"
 
@@ -162,10 +165,11 @@ db-reset:
 ## clean: Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	@if exist $(BINARY_DIR) rmdir /s /q $(BINARY_DIR)
-	@if exist tmp rmdir /s /q tmp
-	@if exist coverage.txt del /q coverage.txt
-	@if exist coverage.html del /q coverage.html
+	@rm -rf $(BINARY_DIR)
+	@rm -rf tmp
+	@rm -f coverage.txt
+	@rm -f coverage.html
+	@rm -f database/migrations/scraped_data.json
 	@echo "Clean completed!"
 
 ## fmt: Format Go code
@@ -178,3 +182,29 @@ fmt:
 dev:
 	@echo "Starting all services in development mode..."
 	docker compose up
+
+## scrape: Scrape data from MangaDex API
+scrape:
+	@echo "Scraping data from MangaDex API..."
+	@cd database/migrations/Scrape && go run mangadex_scraper.go types.go
+	@echo "✓ Scraping completed! Data saved to database/migrations/scraped_data.json"
+
+## import: Import scraped data to database
+import:
+	@echo "Importing data to database..."
+	@cd database/migrations/import && go run import_to_db.go types.go
+	@echo "✓ Import completed!"
+
+## scrape-and-import: Scrape and import data in one command
+scrape-and-import:
+	@echo "Running complete scrape and import process..."
+	@chmod +x database/migrations/scrape_and_import.sh
+	@cd database/migrations && ./scrape_and_import.sh
+	@echo "✓ Process completed!"
+
+## verify-data: Verify imported data in database
+verify-data:
+	@echo "Verifying imported data..."
+	@docker compose exec db psql -U mangahub -d mangahub -c "SELECT COUNT(*) as total_manga FROM manga;"
+	@docker compose exec db psql -U mangahub -d mangahub -c "SELECT COUNT(*) as total_genres FROM genres;"
+	@docker compose exec db psql -U mangahub -d mangahub -c "SELECT COUNT(*) as total_relationships FROM manga_genres;"
