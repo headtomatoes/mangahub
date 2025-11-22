@@ -12,6 +12,7 @@ type User struct {
 	Username  string     `gorm:"uniqueIndex;not null" json:"username"`
 	Email     string     `gorm:"uniqueIndex;not null" json:"email"`
 	Password  string     `gorm:"column:password_hash;not null" json:"-"` // Not show in JSON
+	Role      string     `gorm:"default:'user';not null" json:"role"`    // only 2 roles: "user", "admin" for now | default after creation is "user"
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	LastLogin *time.Time `json:"last_login,omitempty"`

@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 )
-
+ 
 // Server represents the UDP notification server
 type Server struct {
 	conn             *net.UDPConn
