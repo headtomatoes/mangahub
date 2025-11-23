@@ -159,8 +159,11 @@ func (s *authService) generateAccessToken(user *models.User) (string, error) {
 func (s *authService) generateAccessTokenWithScopes(user *models.User, customScopes ...string) (string, error) {
 	// Define default scopes based on role
 	scopeByRole := map[string][]string{
-		"admin": {"read:*", "write:*", "delete:*", "admin:*"},
-		"user":  {"read:manga", "write:comment", "write:profile", "write:community_chat"},
+		"admin": {"read:*", "write:*", "delete:*", "admin:*", "library:*"},
+		"user": {
+			"read:manga", "read:library", "read:genre",
+			"write:comment", "write:profile", "write:community_chat", "write:library",
+		},
 	}
 
 	// Get custom scopes if provided, else use default based on role
@@ -195,8 +198,11 @@ func (s *authService) generateAccessTokenWithScopes(user *models.User, customSco
 func (s *authService) generateAccessTokenWithRequestedScopes(user *models.User, requestedScopes []string) (string, error) {
 	// Define allowed scopes based on user role
 	allowedScopesByRole := map[string][]string{
-		"admin": {"read:*", "write:*", "delete:*", "admin:*"},
-		"user":  {"read:manga", "write:comment", "write:profile", "write:community_chat"},
+		"admin": {"read:*", "write:*", "delete:*", "admin:*", "library:*"},
+		"user": {
+			"read:manga", "read:library", "read:genre",
+			"write:comment", "write:profile", "write:community_chat", "write:library",
+		},
 	}
 	allowed := allowedScopesByRole[user.Role]
 
