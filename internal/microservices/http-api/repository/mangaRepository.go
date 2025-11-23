@@ -35,9 +35,8 @@ func (r *MangaRepo) GetAll(ctx context.Context, page, pageSize int) ([]models.Ma
 	// Calculate offset
 	offset := (page - 1) * pageSize
 
-	// Fetch paginated results
+	// Fetch paginated results (without genres for better performance)
 	if err := r.db.WithContext(ctx).
-		Preload("Genres").
 		Order("created_at desc").
 		Limit(pageSize).
 		Offset(offset).

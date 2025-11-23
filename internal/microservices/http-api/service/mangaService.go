@@ -30,9 +30,7 @@ type MangaService interface {
 	SearchByTitle(ctx context.Context, title string) ([]models.Manga, error)
 
 	// manga <-> genres (for handler endpoints)
-	GetGenresByManga(ctx context.Context, mangaID int64) ([]models.Genre, error)
-	AddGenresToManga(ctx context.Context, mangaID int64, genreIDs []int64) error
-	RemoveGenresFromManga(ctx context.Context, mangaID int64, genreIDs []int64) error
+	ReplaceGenresForManga(ctx context.Context, mangaID int64, genreIDs []int64) error
 }
 
 type mangaService struct {
@@ -167,32 +165,39 @@ func (s *mangaService) SearchByTitle(ctx context.Context, title string) ([]model
 	return s.repo.SearchByTitle(ctx, title)
 }
 
-func (s *mangaService) GetGenresByManga(ctx context.Context, mangaID int64) ([]models.Genre, error) {
-	return s.repo.GetGenresByManga(ctx, mangaID)
-}
-
-func (s *mangaService) AddGenresToManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
-	if len(genreIDs) == 0 {
-		return nil
-	}
+func (s *mangaService) ReplaceGenresForManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
+	// Validate genre IDs
 	for _, id := range genreIDs {
 		if id <= 0 {
 			return fmt.Errorf("invalid genre id: %d", id)
 		}
 	}
-	return s.repo.AddGenresToManga(ctx, mangaID, genreIDs)
-}
 
-func (s *mangaService) RemoveGenresFromManga(ctx context.Context, mangaID int64, genreIDs []int64) error {
-	if len(genreIDs) == 0 {
-		return nil
+	// Get current genres
+	currentGenres, err := s.repo.GetGenresByManga(ctx, mangaID)
+	if err != nil {
+		return fmt.Errorf("failed to get current genres: %w", err)
 	}
-	for _, id := range genreIDs {
-		if id <= 0 {
-			return fmt.Errorf("invalid genre id: %d", id)
+
+	// Remove all current genres
+	if len(currentGenres) > 0 {
+		currentGenreIDs := make([]int64, len(currentGenres))
+		for i, g := range currentGenres {
+			currentGenreIDs[i] = g.ID
+		}
+		if err := s.repo.RemoveGenresFromManga(ctx, mangaID, currentGenreIDs); err != nil {
+			return fmt.Errorf("failed to remove current genres: %w", err)
 		}
 	}
-	return s.repo.RemoveGenresFromManga(ctx, mangaID, genreIDs)
+
+	// Add new genres
+	if len(genreIDs) > 0 {
+		if err := s.repo.AddGenresToManga(ctx, mangaID, genreIDs); err != nil {
+			return fmt.Errorf("failed to add new genres: %w", err)
+		}
+	}
+
+	return nil
 }
 
 /* helper: generate slug-like string from title */

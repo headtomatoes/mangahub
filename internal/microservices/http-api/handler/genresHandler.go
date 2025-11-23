@@ -81,9 +81,10 @@ func (h *GenreHandler) GetMangasByGenre(c *gin.Context) {
 		return
 	}
 
-	resp := make([]dto.MangaResponse, 0, len(list))
+	// Use basic response with only essential fields (same as List endpoint)
+	resp := make([]dto.MangaBasicResponse, 0, len(list))
 	for _, m := range list {
-		resp = append(resp, dto.FromModelToResponse(m))
+		resp = append(resp, dto.FromModelToBasicResponse(m))
 	}
 	c.JSON(http.StatusOK, resp)
 }
