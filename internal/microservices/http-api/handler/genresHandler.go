@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"mangahub/internal/microservices/http-api/dto"
+	"mangahub/internal/microservices/http-api/middleware"
 	"mangahub/internal/microservices/http-api/models"
 	"mangahub/internal/microservices/http-api/service"
 
@@ -22,11 +23,11 @@ func NewGenreHandler(svc service.GenreService) *GenreHandler {
 }
 
 func (h *GenreHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.GET("/", h.List)
-	rg.POST("/", h.Create)
+	rg.GET("/", middleware.RequireScopes("read:genre"), h.List)
+	rg.POST("/", middleware.RequireScopes("write:genre"), h.Create)
 
 	// new route: GET /api/genres/:id/mangas
-	rg.GET("/:id/mangas", h.GetMangasByGenre)
+	rg.GET("/:id/mangas", middleware.RequireScopes("read:manga"), h.GetMangasByGenre)
 }
 
 func (h *GenreHandler) List(c *gin.Context) {
