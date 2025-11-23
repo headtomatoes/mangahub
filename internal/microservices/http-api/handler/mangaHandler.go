@@ -128,7 +128,7 @@ func (h *MangaHandler) Create(c *gin.Context) {
 }
 
 func (h *MangaHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("manga_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -176,7 +176,7 @@ func (h *MangaHandler) Update(c *gin.Context) {
 }
 
 func (h *MangaHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("manga_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})

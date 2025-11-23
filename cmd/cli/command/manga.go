@@ -262,98 +262,98 @@ var deleteMangaCmd = &cobra.Command{
 	},
 }
 
-var genresCmd = &cobra.Command{
-	Use:   "genres [manga-id]",
-	Short: "Get genres for a manga",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid manga ID: %w", err)
-		}
+// var genresCmd = &cobra.Command{
+// 	Use:   "genres [manga-id]",
+// 	Short: "Get genres for a manga",
+// 	Args:  cobra.ExactArgs(1),
+// 	RunE: func(cmd *cobra.Command, args []string) error {
+// 		id, err := strconv.ParseInt(args[0], 10, 64)
+// 		if err != nil {
+// 			return fmt.Errorf("invalid manga ID: %w", err)
+// 		}
 
-		httpClient := GetAuthenticatedClient()
+// 		httpClient := GetAuthenticatedClient()
 
-		genres, err := httpClient.GetMangaGenres(id)
-		if err != nil {
-			return fmt.Errorf("failed to get genres: %w", err)
-		}
+// 		genres, err := httpClient.GetMangaGenres(id)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to get genres: %w", err)
+// 		}
 
-		if len(genres) == 0 {
-			fmt.Println("No genres found for this manga.")
-			return nil
-		}
+// 		if len(genres) == 0 {
+// 			fmt.Println("No genres found for this manga.")
+// 			return nil
+// 		}
 
-		fmt.Printf("Genres for manga %d:\n", id)
-		for _, g := range genres {
-			fmt.Printf("- %s (ID: %d)\n", g.Name, g.ID)
-		}
+// 		fmt.Printf("Genres for manga %d:\n", id)
+// 		for _, g := range genres {
+// 			fmt.Printf("- %s (ID: %d)\n", g.Name, g.ID)
+// 		}
 
-		return nil
-	},
-}
+// 		return nil
+// 	},
+// }
 
-var addGenresCmd = &cobra.Command{
-	Use:   "add-genres [manga-id] [genre-ids...]",
-	Short: "Add genres to a manga",
-	Args:  cobra.MinimumNArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		mangaID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid manga ID: %w", err)
-		}
+// var addGenresCmd = &cobra.Command{
+// 	Use:   "add-genres [manga-id] [genre-ids...]",
+// 	Short: "Add genres to a manga",
+// 	Args:  cobra.MinimumNArgs(2),
+// 	RunE: func(cmd *cobra.Command, args []string) error {
+// 		mangaID, err := strconv.ParseInt(args[0], 10, 64)
+// 		if err != nil {
+// 			return fmt.Errorf("invalid manga ID: %w", err)
+// 		}
 
-		genreIDs := make([]int64, 0, len(args)-1)
-		for _, arg := range args[1:] {
-			gID, err := strconv.ParseInt(arg, 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid genre ID '%s': %w", arg, err)
-			}
-			genreIDs = append(genreIDs, gID)
-		}
+// 		genreIDs := make([]int64, 0, len(args)-1)
+// 		for _, arg := range args[1:] {
+// 			gID, err := strconv.ParseInt(arg, 10, 64)
+// 			if err != nil {
+// 				return fmt.Errorf("invalid genre ID '%s': %w", arg, err)
+// 			}
+// 			genreIDs = append(genreIDs, gID)
+// 		}
 
-		httpClient := GetAuthenticatedClient()
+// 		httpClient := GetAuthenticatedClient()
 
-		err = httpClient.AddMangaGenres(mangaID, genreIDs)
-		if err != nil {
-			return fmt.Errorf("failed to add genres: %w", err)
-		}
+// 		err = httpClient.AddMangaGenres(mangaID, genreIDs)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to add genres: %w", err)
+// 		}
 
-		fmt.Printf("✓ Genres added to manga %d successfully!\n", mangaID)
-		return nil
-	},
-}
+// 		fmt.Printf("✓ Genres added to manga %d successfully!\n", mangaID)
+// 		return nil
+// 	},
+// }
 
-var removeGenresCmd = &cobra.Command{
-	Use:   "remove-genres [manga-id] [genre-ids...]",
-	Short: "Remove genres from a manga",
-	Args:  cobra.MinimumNArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		mangaID, err := strconv.ParseInt(args[0], 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid manga ID: %w", err)
-		}
+// var removeGenresCmd = &cobra.Command{
+// 	Use:   "remove-genres [manga-id] [genre-ids...]",
+// 	Short: "Remove genres from a manga",
+// 	Args:  cobra.MinimumNArgs(2),
+// 	RunE: func(cmd *cobra.Command, args []string) error {
+// 		mangaID, err := strconv.ParseInt(args[0], 10, 64)
+// 		if err != nil {
+// 			return fmt.Errorf("invalid manga ID: %w", err)
+// 		}
 
-		genreIDs := make([]int64, 0, len(args)-1)
-		for _, arg := range args[1:] {
-			gID, err := strconv.ParseInt(arg, 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid genre ID '%s': %w", arg, err)
-			}
-			genreIDs = append(genreIDs, gID)
-		}
+// 		genreIDs := make([]int64, 0, len(args)-1)
+// 		for _, arg := range args[1:] {
+// 			gID, err := strconv.ParseInt(arg, 10, 64)
+// 			if err != nil {
+// 				return fmt.Errorf("invalid genre ID '%s': %w", arg, err)
+// 			}
+// 			genreIDs = append(genreIDs, gID)
+// 		}
 
-		httpClient := GetAuthenticatedClient()
+// 		httpClient := GetAuthenticatedClient()
 
-		err = httpClient.RemoveMangaGenres(mangaID, genreIDs)
-		if err != nil {
-			return fmt.Errorf("failed to remove genres: %w", err)
-		}
+// 		err = httpClient.RemoveMangaGenres(mangaID, genreIDs)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to remove genres: %w", err)
+// 		}
 
-		fmt.Printf("✓ Genres removed from manga %d successfully!\n", mangaID)
-		return nil
-	},
-}
+// 		fmt.Printf("✓ Genres removed from manga %d successfully!\n", mangaID)
+// 		return nil
+// 	},
+// }
 
 func init() {
 	// Add subcommands
@@ -363,9 +363,9 @@ func init() {
 	mangaCmd.AddCommand(createMangaCmd)
 	mangaCmd.AddCommand(updateMangaCmd)
 	mangaCmd.AddCommand(deleteMangaCmd)
-	mangaCmd.AddCommand(genresCmd)
-	mangaCmd.AddCommand(addGenresCmd)
-	mangaCmd.AddCommand(removeGenresCmd)
+	//mangaCmd.AddCommand(genresCmd)
+	//mangaCmd.AddCommand(addGenresCmd)
+	//mangaCmd.AddCommand(removeGenresCmd)
 
 	// Create flags
 	createMangaCmd.Flags().String("title", "", "Manga title (required)")

@@ -1,11 +1,139 @@
-# Rebuild
+# MangaHub CLI Commands Guide
+
+## Setup & Build
+# Rebuild the CLI
 go build -o mangahub ./cmd/cli
+
+## Authentication Commands
 
 # Logout first to clear any bad tokens
 ./mangahub auth logout
 
-# Login again
-./mangahub auth login -u "manCity3" -p "mcfc1213"
+# Register a new account
+./mangahub auth register -u 'username' -p 'password' -e 'email@example.com'
 
-# Test manga list
+# Login to your account
+./mangahub auth login -u 'admin' -p 'SecurePass123!'
+
+# Automatic login using stored credentials
+./mangahub auth autologin
+
+# Revoke your refresh token
+./mangahub auth revoke-token
+
+## Manga Commands
+
+# List all manga
 ./mangahub manga list
+
+# Get manga by ID
+./mangahub manga get [manga-id]
+
+# Search manga by title, author, or slug
+./mangahub manga search [query]
+
+# Create a new manga (admin only)
+./mangahub manga create --title "Manga Title" --author "Author Name" --status "ongoing" --chapters 100 --description "Description" --cover-url "https://example.com/cover.jpg" --slug "manga-slug"
+
+# Update a manga (admin only)
+./mangahub manga update [manga-id] --title "New Title" --status "completed"
+
+# Delete a manga (admin only)
+./mangahub manga delete [manga-id]
+
+## Library Commands
+
+# View your library
+./mangahub library list
+
+# Add manga to your library
+./mangahub library add [manga-id]
+
+# Remove manga from your library
+./mangahub library remove [manga-id]
+
+## Rating Commands
+
+# Rate a manga (1-10)
+./mangahub rating rate [manga-id] [rating]
+# Example: ./mangahub rating rate 1 9
+
+# Get your rating for a manga
+./mangahub rating get [manga-id]
+
+# Delete your rating for a manga
+./mangahub rating delete [manga-id]
+
+# List all ratings for a manga (with pagination)
+./mangahub rating list [manga-id]
+./mangahub rating list [manga-id] --page 2 --page-size 10
+
+# Get average rating for a manga
+./mangahub rating average [manga-id]
+
+## Comment Commands
+
+# Create a comment on a manga
+./mangahub comment create [manga-id] "Your comment text here"
+# Example: ./mangahub comment create 1 "This manga is amazing!"
+
+# Update your comment
+./mangahub comment update [comment-id] "Updated comment text"
+
+# Delete your comment
+./mangahub comment delete [comment-id]
+
+# Get a specific comment by ID
+./mangahub comment get [comment-id]
+
+# List all comments for a manga (with pagination)
+./mangahub comment list [manga-id]
+./mangahub comment list [manga-id] --page 2 --page-size 10
+
+# List all your comments
+./mangahub comment my-comments
+./mangahub comment my-comments --page 1 --page-size 20
+
+## Genre Commands
+
+# List all available genres
+./mangahub genre list
+
+# Create a new genre (admin only)
+./mangahub genre create "Genre Name"
+# Example: ./mangahub genre create "Isekai"
+
+# Get all manga in a specific genre
+./mangahub genre mangas [genre-id]
+
+## Global Flags
+
+# Use a custom API URL
+./mangahub --api-url "http://localhost:8084" [command]
+
+# Or set it as an environment variable
+export MANGAHUB_API_URL="http://localhost:8084"
+
+## Examples
+
+# Complete workflow example
+./mangahub auth login -u 'admin' -p 'SecurePass123!'
+./mangahub manga list
+./mangahub library add 1
+./mangahub rating rate 1 10
+./mangahub comment create 1 "Great manga"
+./mangahub genre list
+./mangahub auth logout
+
+# Search and rate workflow
+./mangahub manga search "one piece"
+./mangahub manga get 1
+./mangahub rating average 1
+./mangahub rating rate 1 9
+./mangahub comment list 1
+
+# Admin workflow (create content)
+./mangahub auth login -u 'admin' -p 'SecurePass123!'
+./mangahub genre create "Action"
+./mangahub manga create --title "New Manga" --author "Author" --status "ongoing"
+
