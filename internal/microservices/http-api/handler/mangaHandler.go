@@ -27,12 +27,12 @@ func (h *MangaHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Public routes (any authenticated user)
 	rg.GET("/", middleware.RequireScopes("read:manga"), h.List)
 	rg.GET("/search", middleware.RequireScopes("read:manga"), h.SearchByTitle)
-	rg.GET("/:id", middleware.RequireScopes("read:manga"), h.Get)
+	rg.GET("/:manga_id", middleware.RequireScopes("read:manga"), h.Get)
 
 	// Admin-only routes
 	rg.POST("/", middleware.RequireScopes("read:manga", "write:manga"), middleware.RequireAdmin(), h.Create)
-	rg.PUT("/:id", middleware.RequireScopes("read:manga", "write:manga"), middleware.RequireAdmin(), h.Update)
-	rg.DELETE("/:id", middleware.RequireScopes("delete:manga"), middleware.RequireAdmin(), h.Delete)
+	rg.PUT("/:manga_id", middleware.RequireScopes("read:manga", "write:manga"), middleware.RequireAdmin(), h.Update)
+	rg.DELETE("/:manga_id", middleware.RequireScopes("delete:manga"), middleware.RequireAdmin(), h.Delete)
 }
 
 func (h *MangaHandler) List(c *gin.Context) {
@@ -71,7 +71,7 @@ func (h *MangaHandler) List(c *gin.Context) {
 }
 
 func (h *MangaHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("manga_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})

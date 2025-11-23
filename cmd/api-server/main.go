@@ -64,6 +64,8 @@ func main() {
 		&models.UserLibrary{},
 		&models.UserProgress{},
 		&models.Notification{},
+		&models.Rating{},
+		&models.Comment{},
 	); err != nil {
 		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
@@ -99,6 +101,16 @@ func main() {
 	progressSvc := svc.NewProgressService(progressRepo)
 	progressHandler := h.NewProgressHandler(progressSvc)
 
+	// rating setup
+	ratingRepo := repo.NewRatingRepository(gdb)
+	ratingSvc := svc.NewRatingService(ratingRepo, mangaRepo)
+	ratingHandler := h.NewRatingHandler(ratingSvc)
+
+	// comment setup
+	commentRepo := repo.NewCommentRepository(gdb)
+	commentSvc := svc.NewCommentService(commentRepo, mangaRepo)
+	commentHandler := h.NewCommentHandler(commentSvc)
+
 	// Gin setup
 	r := gin.New()
 	r.Use(gin.Logger())
@@ -127,12 +139,15 @@ func main() {
 	api := r.Group("/api")
 	api.Use(mid.AuthMiddleware(authSvc))
 	{
-		mangaHandler.RegisterRoutes(api.Group("/manga")) // newly added the scopes based middleware in handler | other handlers follow same pattern later
+		mangaGroup := api.Group("/manga")
+		mangaHandler.RegisterRoutes(mangaGroup)   // Register manga routes
+		ratingHandler.RegisterRoutes(mangaGroup)  // Register rating routes under manga group
+		commentHandler.RegisterRoutes(mangaGroup) // Register comment routes under manga group
+
 		genreHandler.RegisterRoutes(api.Group("/genres"))
 		libraryHandler.RegisterRoutes(api.Group("/library"))
 		progressHandler.RegisterRoutes(api.Group("/progress"))
-		notificationHandler.RegisterRoutes(api.Group("/notifications")) // Add this
-
+		notificationHandler.RegisterRoutes(api.Group("/notifications"))
 	}
 
 	// Health/readiness

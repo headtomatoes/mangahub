@@ -10,6 +10,7 @@ type Manga struct {
 	Status        *string    `json:"status,omitempty"`
 	TotalChapters *int       `json:"total_chapters,omitempty"`
 	Description   *string    `json:"description,omitempty"`
+	AverageRating *float64   `json:"average_rating,omitempty" gorm:"type:decimal(3,2)"`
 	CoverURL      *string    `json:"cover_url,omitempty"`
 	CreatedAt     *time.Time `json:"created_at,omitempty" gorm:"autoCreateTime"`
 
