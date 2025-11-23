@@ -121,6 +121,14 @@ type LibraryListResponse struct {
 	Total int                   `json:"total"`
 }
 
+type PaginatedMangaResponse struct {
+	Data       []MangaResponse `json:"data"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"page_size"`
+	Total      int64           `json:"total"`
+	TotalPages int             `json:"total_pages"`
+}
+
 // constructor for HTTP client
 func NewHTTPClient(apiURL string) *HTTPClient {
 	return &HTTPClient{
@@ -261,11 +269,11 @@ func (c *HTTPClient) GetAllManga() ([]MangaResponse, error) {
 		return nil, fmt.Errorf("failed to get manga list: %s", resp.Status)
 	}
 
-	var result []MangaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var paginatedResult PaginatedMangaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&paginatedResult); err != nil {
 		return nil, err
 	}
-	return result, nil
+	return paginatedResult.Data, nil
 }
 
 func (c *HTTPClient) GetMangaByID(id int64) (*MangaResponse, error) {
