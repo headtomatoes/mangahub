@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"mangahub/internal/microservices/http-api/dto"
+	"mangahub/internal/microservices/http-api/middleware"
 	"mangahub/internal/microservices/http-api/models"
 	"mangahub/internal/microservices/http-api/service"
 	"net/http"
@@ -21,10 +22,10 @@ func NewProgressHandler(progressService service.ProgressService) *ProgressHandle
 
 // RegisterRoutes registers the progress-related routes
 func (h *ProgressHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	rg.GET("", h.GetAllProgress)
-	rg.GET("/:manga_id", h.GetProgressByMangaID)
-	rg.POST("/:manga_id", h.UpdateProgress)
-	rg.DELETE("/:manga_id", h.DeleteProgress)
+	rg.GET("", middleware.RequireScopes("read:progress"), h.GetAllProgress)
+	rg.GET("/:manga_id", middleware.RequireScopes("read:progress"), h.GetProgressByMangaID)
+	rg.POST("/:manga_id", middleware.RequireScopes("write:progress"), h.UpdateProgress)
+	rg.DELETE("/:manga_id", middleware.RequireScopes("write:progress"), h.DeleteProgress)
 }
 
 func (h *ProgressHandler) GetAllProgress(c *gin.Context) {

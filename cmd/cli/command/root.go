@@ -112,6 +112,8 @@ func init() {
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(mangaCmd)
 	rootCmd.AddCommand(libraryCmd)
+	rootCmd.AddCommand(progressCmd)
+	rootCmd.AddCommand(syncCmd)
 }
 
 // GetAuthenticatedClient returns an HTTP client with the current access token

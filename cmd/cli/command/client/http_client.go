@@ -554,3 +554,120 @@ func (c *HTTPClient) RemoveFromLibrary(mangaID int64) error {
 
 	return nil
 }
+
+// Progress-related structures
+type UpdateProgressRequest struct {
+	UserID  string `json:"user_id"`
+	MangaID int64  `json:"manga_id"`
+	Chapter int    `json:"chapter"`
+	Status  string `json:"status"`
+	Volume  *int   `json:"volume,omitempty"`
+	Notes   string `json:"notes,omitempty"`
+}
+
+type ProgressResponse struct {
+	UserID          string    `json:"user_id"`
+	MangaID         int64     `json:"manga_id"`
+	MangaTitle      string    `json:"manga_title,omitempty"`
+	Chapter         int       `json:"chapter"`
+	Volume          *int      `json:"volume,omitempty"`
+	Status          string    `json:"status"`
+	Notes           string    `json:"notes,omitempty"`
+	PreviousChapter int       `json:"previous_chapter,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	TotalChapters   *int      `json:"total_chapters,omitempty"`
+	ReadingStreak   int       `json:"reading_streak,omitempty"`
+}
+
+type ProgressHistoryResponse struct {
+	History []ProgressResponse `json:"history"`
+	Total   int                `json:"total"`
+}
+
+// Progress methods
+func (c *HTTPClient) GetProgress(mangaID int64) (*ProgressResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/progress/%d", c.baseURL, mangaID), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("progress not found")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get progress: %s", resp.Status)
+	}
+
+	var result ProgressResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) UpdateProgress(request *UpdateProgressRequest) (*ProgressResponse, error) {
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/progress/%d", c.baseURL, request.MangaID), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to update progress: %s", resp.Status)
+	}
+
+	var result ProgressResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) GetProgressHistory(mangaID *int64) (*ProgressHistoryResponse, error) {
+	url := c.baseURL + "/api/progress/history"
+	if mangaID != nil {
+		url = fmt.Sprintf("%s?manga_id=%d", url, *mangaID)
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get progress history: %s", resp.Status)
+	}
+
+	var result ProgressHistoryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
