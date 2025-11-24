@@ -129,6 +129,70 @@ type PaginatedMangaResponse struct {
 	TotalPages int             `json:"total_pages"`
 }
 
+// Rating-related request/response structures
+type CreateRatingRequest struct {
+	Rating int `json:"rating"`
+}
+
+type RatingResponse struct {
+	Username  string    `json:"username"`
+	Rating    int       `json:"rating"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PaginatedRatingsResponse struct {
+	Data       []RatingResponse `json:"data"`
+	Page       int              `json:"page"`
+	PageSize   int              `json:"page_size"`
+	Total      int64            `json:"total"`
+	TotalPages int              `json:"total_pages"`
+}
+
+type AverageRatingResponse struct {
+	AverageRating float64 `json:"average_rating"`
+	TotalRatings  int64   `json:"total_ratings"`
+}
+
+// Comment-related request/response structures
+type CreateCommentRequest struct {
+	Content string `json:"content"`
+}
+
+type UpdateCommentRequest struct {
+	Content string `json:"content"`
+}
+
+type CommentResponse struct {
+	Username  string    `json:"username"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PaginatedCommentsResponse struct {
+	Data       []CommentResponse `json:"data"`
+	Page       int               `json:"page"`
+	PageSize   int               `json:"page_size"`
+	Total      int64             `json:"total"`
+	TotalPages int               `json:"total_pages"`
+}
+
+// Genre-related structures
+type CreateGenreRequest struct {
+	Name string `json:"name"`
+}
+
+type MangaBasicResponse struct {
+	ID            int64   `json:"id"`
+	Slug          *string `json:"slug,omitempty"`
+	Title         string  `json:"title"`
+	Author        *string `json:"author,omitempty"`
+	Status        *string `json:"status,omitempty"`
+	TotalChapters *int    `json:"total_chapters,omitempty"`
+	CoverURL      *string `json:"cover_url,omitempty"`
+}
+
 // constructor for HTTP client
 func NewHTTPClient(apiURL string) *HTTPClient {
 	return &HTTPClient{
@@ -403,81 +467,81 @@ func (c *HTTPClient) DeleteManga(id int64) error {
 	return nil
 }
 
-func (c *HTTPClient) GetMangaGenres(mangaID int64) ([]GenreResponse, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d/genres", c.baseURL, mangaID), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+// func (c *HTTPClient) GetMangaGenres(mangaID int64) ([]GenreResponse, error) {
+// 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d/genres", c.baseURL, mangaID), nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	req.Header.Set("Authorization", "Bearer "+c.token)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+// 	resp, err := c.httpClient.Do(req)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get genres: %s", resp.Status)
-	}
+// 	if resp.StatusCode != http.StatusOK {
+// 		return nil, fmt.Errorf("failed to get genres: %s", resp.Status)
+// 	}
 
-	var result []GenreResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
+// 	var result []GenreResponse
+// 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+// 		return nil, err
+// 	}
+// 	return result, nil
+// }
 
-func (c *HTTPClient) AddMangaGenres(mangaID int64, genreIDs []int64) error {
-	request := GenreIDsRequest{GenreIDs: genreIDs}
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
+// func (c *HTTPClient) AddMangaGenres(mangaID int64, genreIDs []int64) error {
+// 	request := GenreIDsRequest{GenreIDs: genreIDs}
+// 	jsonData, err := json.Marshal(request)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/manga/%d/genres", c.baseURL, mangaID), bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
+// 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/manga/%d/genres", c.baseURL, mangaID), bytes.NewBuffer(jsonData))
+// 	if err != nil {
+// 		return err
+// 	}
+// 	req.Header.Set("Authorization", "Bearer "+c.token)
+// 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+// 	resp, err := c.httpClient.Do(req)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to add genres: %s", resp.Status)
-	}
-	return nil
-}
+// 	if resp.StatusCode != http.StatusNoContent {
+// 		return fmt.Errorf("failed to add genres: %s", resp.Status)
+// 	}
+// 	return nil
+// }
 
-func (c *HTTPClient) RemoveMangaGenres(mangaID int64, genreIDs []int64) error {
-	request := GenreIDsRequest{GenreIDs: genreIDs}
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
+// func (c *HTTPClient) RemoveMangaGenres(mangaID int64, genreIDs []int64) error {
+// 	request := GenreIDsRequest{GenreIDs: genreIDs}
+// 	jsonData, err := json.Marshal(request)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/manga/%d/genres", c.baseURL, mangaID), bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
+// 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/manga/%d/genres", c.baseURL, mangaID), bytes.NewBuffer(jsonData))
+// 	if err != nil {
+// 		return err
+// 	}
+// 	req.Header.Set("Authorization", "Bearer "+c.token)
+// 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+// 	resp, err := c.httpClient.Do(req)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("failed to remove genres: %s", resp.Status)
-	}
-	return nil
-}
+// 	if resp.StatusCode != http.StatusNoContent {
+// 		return fmt.Errorf("failed to remove genres: %s", resp.Status)
+// 	}
+// 	return nil
+// }
 
 // Library methods
 func (c *HTTPClient) AddToLibrary(mangaID int64) error {
@@ -553,4 +617,368 @@ func (c *HTTPClient) RemoveFromLibrary(mangaID int64) error {
 	}
 
 	return nil
+}
+
+// Rating methods
+func (c *HTTPClient) CreateOrUpdateRating(mangaID int64, rating int) (*RatingResponse, error) {
+	request := CreateRatingRequest{Rating: rating}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/manga/%d/ratings", c.baseURL, mangaID), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to create/update rating: %s", resp.Status)
+	}
+
+	var result RatingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) GetUserRating(mangaID int64) (*RatingResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d/ratings/me", c.baseURL, mangaID), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get rating: %s", resp.Status)
+	}
+
+	var result RatingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) DeleteRating(mangaID int64) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/manga/%d/ratings", c.baseURL, mangaID), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete rating: %s", resp.Status)
+	}
+	return nil
+}
+
+func (c *HTTPClient) ListMangaRatings(mangaID int64, page, pageSize int) (*PaginatedRatingsResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d/ratings?page=%d&page_size=%d", c.baseURL, mangaID, page, pageSize), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list ratings: %s", resp.Status)
+	}
+
+	var result PaginatedRatingsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) GetAverageRating(mangaID int64) (*AverageRatingResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d/ratings/average", c.baseURL, mangaID), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get average rating: %s", resp.Status)
+	}
+
+	var result AverageRatingResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Comment methods
+func (c *HTTPClient) CreateComment(mangaID int64, content string) (*CommentResponse, error) {
+	request := CreateCommentRequest{Content: content}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/manga/%d/comments", c.baseURL, mangaID), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create comment: %s", resp.Status)
+	}
+
+	var result CommentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) UpdateComment(commentID int64, content string) (*CommentResponse, error) {
+	request := UpdateCommentRequest{Content: content}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/api/manga/comments/%d", c.baseURL, commentID), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update comment: %s", resp.Status)
+	}
+
+	var result CommentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) DeleteComment(commentID int64) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/manga/comments/%d", c.baseURL, commentID), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete comment: %s", resp.Status)
+	}
+	return nil
+}
+
+func (c *HTTPClient) GetCommentByID(commentID int64) (*CommentResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/comments/%d", c.baseURL, commentID), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("comment not found: %s", resp.Status)
+	}
+
+	var result CommentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) ListMangaComments(mangaID int64, page, pageSize int) (*PaginatedCommentsResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d/comments?page=%d&page_size=%d", c.baseURL, mangaID, page, pageSize), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list comments: %s", resp.Status)
+	}
+
+	var result PaginatedCommentsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) ListUserComments(page, pageSize int) (*PaginatedCommentsResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/comments/me?page=%d&page_size=%d", c.baseURL, page, pageSize), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list user comments: %s", resp.Status)
+	}
+
+	var result PaginatedCommentsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Genre methods
+func (c *HTTPClient) GetAllGenres() ([]GenreResponse, error) {
+	req, err := http.NewRequest("GET", c.baseURL+"/api/genres/", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get genres: %s", resp.Status)
+	}
+
+	var result []GenreResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *HTTPClient) CreateGenre(name string) (*GenreResponse, error) {
+	request := CreateGenreRequest{Name: name}
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/genres/", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		// Try to read the error message from response body
+		var errorResp map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err == nil {
+			if errMsg, ok := errorResp["error"]; ok {
+				return nil, fmt.Errorf("failed to create genre: %s - %v", resp.Status, errMsg)
+			}
+		}
+		return nil, fmt.Errorf("failed to create genre: %s", resp.Status)
+	}
+
+	var result GenreResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClient) GetMangasByGenre(genreID int64) ([]MangaBasicResponse, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/genres/%d/mangas", c.baseURL, genreID), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get mangas by genre: %s", resp.Status)
+	}
+
+	var result []MangaBasicResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

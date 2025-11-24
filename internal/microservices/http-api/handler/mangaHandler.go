@@ -24,17 +24,15 @@ func NewMangaHandler(svc service.MangaService) *MangaHandler {
 }
 
 func (h *MangaHandler) RegisterRoutes(rg *gin.RouterGroup) {
+	// Public routes (any authenticated user)
 	rg.GET("/", middleware.RequireScopes("read:manga"), h.List)
-	rg.GET("/search", middleware.RequireScopes("read:manga"), h.SearchByTitle) // new route (supports ?q= or ?title=)
-	rg.GET("/:id", middleware.RequireScopes("read:manga"), h.Get)
-	rg.POST("/", middleware.RequireScopes("read:manga", "write:manga"), h.Create)
-	rg.PUT("/:id", middleware.RequireScopes("read:manga", "write:manga"), h.Update)
-	rg.DELETE("/:id", middleware.RequireScopes("delete:manga"), h.Delete)
+	rg.GET("/search", middleware.RequireScopes("read:manga"), h.SearchByTitle)
+	rg.GET("/:manga_id", middleware.RequireScopes("read:manga"), h.Get)
 
-	// genres for a manga
-	rg.GET("/:id/genres", middleware.RequireScopes("read:manga"), h.GetMangaGenres)
-	rg.POST("/:id/genres", middleware.RequireScopes("read:manga", "write:manga"), h.AddMangaGenres)
-	rg.DELETE("/:id/genres", middleware.RequireScopes("delete:manga"), h.RemoveMangaGenres)
+	// Admin-only routes
+	rg.POST("/", middleware.RequireScopes("read:manga", "write:manga"), middleware.RequireAdmin(), h.Create)
+	rg.PUT("/:manga_id", middleware.RequireScopes("read:manga", "write:manga"), middleware.RequireAdmin(), h.Update)
+	rg.DELETE("/:manga_id", middleware.RequireScopes("delete:manga"), middleware.RequireAdmin(), h.Delete)
 }
 
 func (h *MangaHandler) List(c *gin.Context) {
@@ -63,16 +61,17 @@ func (h *MangaHandler) List(c *gin.Context) {
 		return
 	}
 
-	resp := make([]dto.MangaResponse, 0, len(list))
+	// Use basic response with only essential fields
+	resp := make([]dto.MangaBasicResponse, 0, len(list))
 	for _, m := range list {
-		resp = append(resp, dto.FromModelToResponse(m))
+		resp = append(resp, dto.FromModelToBasicResponse(m))
 	}
 
-	c.JSON(http.StatusOK, dto.NewPaginatedMangaResponse(resp, page, pageSize, total))
+	c.JSON(http.StatusOK, dto.NewPaginatedMangaBasicResponse(resp, page, pageSize, total))
 }
 
 func (h *MangaHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("manga_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -99,15 +98,37 @@ func (h *MangaHandler) Create(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
+	// Create manga
 	if err := h.svc.Create(ctx, &model); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, dto.FromModelToResponse(model))
+
+	// Assign genres if provided
+	if len(in.GenreIDs) > 0 {
+		if err := h.svc.ReplaceGenresForManga(ctx, model.ID, in.GenreIDs); err != nil {
+			// Log the error but don't fail the request since manga was created
+			c.JSON(http.StatusCreated, gin.H{
+				"manga":   dto.FromModelToResponse(model),
+				"warning": "Manga created but failed to assign some genres: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	// Fetch the manga with genres to return complete data
+	created, err := h.svc.GetByID(ctx, model.ID)
+	if err != nil {
+		// Manga was created but we couldn't fetch it back
+		c.JSON(http.StatusCreated, dto.FromModelToResponse(model))
+		return
+	}
+
+	c.JSON(http.StatusCreated, dto.FromModelToResponse(*created))
 }
 
 func (h *MangaHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("manga_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -127,11 +148,24 @@ func (h *MangaHandler) Update(c *gin.Context) {
 	var m models.Manga
 	in.ApplyTo(&m)
 
+	// Update manga basic info
 	if err := h.svc.Update(ctx, id, &m); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Replace genres if provided
+	if in.GenreIDs != nil {
+		if err := h.svc.ReplaceGenresForManga(ctx, id, in.GenreIDs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Manga updated but failed to update genres: " + err.Error(),
+				"manga": id,
+			})
+			return
+		}
+	}
+
+	// Fetch updated manga with genres
 	updated, err := h.svc.GetByID(ctx, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -142,7 +176,7 @@ func (h *MangaHandler) Update(c *gin.Context) {
 }
 
 func (h *MangaHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
+	idStr := c.Param("manga_id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
@@ -183,70 +217,4 @@ func (h *MangaHandler) SearchByTitle(c *gin.Context) {
 		resp = append(resp, dto.FromModelToResponse(m))
 	}
 	c.JSON(http.StatusOK, resp)
-}
-
-func (h *MangaHandler) GetMangaGenres(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-
-	list, err := h.svc.GetGenresByManga(ctx, id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	resp := make([]dto.GenreResponse, 0, len(list))
-	for _, g := range list {
-		resp = append(resp, dto.GenreFromModel(g))
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
-func (h *MangaHandler) AddMangaGenres(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	var in dto.GenreIDsRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-
-	if err := h.svc.AddGenresToManga(ctx, id, in.GenreIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-func (h *MangaHandler) RemoveMangaGenres(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	var in dto.GenreIDsRequest
-	if err := c.ShouldBindJSON(&in); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-
-	if err := h.svc.RemoveGenresFromManga(ctx, id, in.GenreIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.Status(http.StatusNoContent)
 }

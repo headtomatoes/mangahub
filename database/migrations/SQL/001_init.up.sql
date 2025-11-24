@@ -1,9 +1,14 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- ========================================
+-- CREATE CUSTOM TYPES
+-- ========================================
+CREATE TYPE user_role AS ENUM ('user', 'admin');
 
 -- ========================================
 -- DROP TABLES (for reset)
 -- ========================================
+DROP TABLE IF EXISTS chapters CASCADE;
 DROP TABLE IF EXISTS ratings CASCADE;
 DROP TABLE IF EXISTS comments CASCADE;
 DROP TABLE IF EXISTS user_sessions CASCADE;
@@ -14,9 +19,8 @@ DROP TABLE IF EXISTS manga_genres CASCADE;
 DROP TABLE IF EXISTS genres CASCADE;
 DROP TABLE IF EXISTS manga CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
 DROP TABLE IF EXISTS user_library CASCADE;
-
+DROP TABLE IF EXISTS notifications CASCADE;
 
 -- ========================================
 -- USERS
@@ -26,10 +30,13 @@ CREATE TABLE users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
+    role user_role NOT NULL DEFAULT 'user',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- ========================================
 -- MANGA
@@ -42,12 +49,14 @@ CREATE TABLE manga (
     status TEXT CHECK(status IN ('ongoing', 'completed', 'hiatus')),
     total_chapters INTEGER,
     description TEXT,
+    average_rating DECIMAL(3,2),
     cover_url TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_manga_title ON manga(title);
-CREATE INDEX idx_manga_author ON manga(author);
-CREATE INDEX idx_manga_status ON manga(status);
+CREATE INDEX IF NOT EXISTS idx_manga_title ON manga(title);
+CREATE INDEX IF NOT EXISTS idx_manga_author ON manga(author);
+CREATE INDEX IF NOT EXISTS idx_manga_status ON manga(status);
+CREATE INDEX IF NOT EXISTS idx_manga_average_rating ON manga(average_rating DESC);
 
 -- ========================================
 -- GENRES
@@ -71,7 +80,6 @@ CREATE TABLE manga_genres (
 -- USER PROGRESS
 -- ========================================
 CREATE TABLE user_progress (
-    -- id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
     current_chapter INTEGER DEFAULT 0,
@@ -87,21 +95,10 @@ CREATE TABLE user_progress (
 CREATE TABLE chat_messages (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    username TEXT NOT NULL,
     message TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-
--- ========================================
--- USER SESSIONS
--- ========================================
--- CREATE TABLE user_sessions (
---     id BIGSERIAL PRIMARY KEY,
---     token TEXT UNIQUE NOT NULL,
---     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
---     expires_at TIMESTAMPTZ NOT NULL,
---     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
--- );
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
 
 -- ========================================
 -- REFRESH TOKENS
@@ -114,6 +111,9 @@ CREATE TABLE refresh_tokens (
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_revoked ON refresh_tokens(revoked);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 
 -- ========================================
 -- COMMENTS
@@ -126,6 +126,8 @@ CREATE TABLE comments (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_manga_id ON comments(manga_id);
 
 -- ========================================
 -- RATINGS
@@ -139,6 +141,7 @@ CREATE TABLE ratings (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, manga_id)
 );
+CREATE INDEX IF NOT EXISTS idx_ratings_manga_id ON ratings(manga_id);
 
 -- ========================================
 -- USER LIBRARY
@@ -150,10 +153,12 @@ CREATE TABLE user_library (
     added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, manga_id)
 );
+CREATE INDEX IF NOT EXISTS idx_user_library_user_id ON user_library(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_library_manga_id ON user_library(manga_id);
 
-CREATE INDEX idx_user_library_user_id ON user_library(user_id);
-CREATE INDEX idx_user_library_manga_id ON user_library(manga_id);
-
+-- ========================================
+-- NOTIFICATIONS
+-- ========================================
 CREATE TABLE notifications (
     id BIGSERIAL PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -164,7 +169,20 @@ CREATE TABLE notifications (
     read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
 
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_read ON notifications(read);
-CREATE INDEX idx_notifications_created_at ON notifications(created_at);
+-- ========================================
+-- CHAPTERS
+-- ========================================
+CREATE TABLE chapters (
+    id BIGSERIAL PRIMARY KEY,
+    manga_id BIGINT NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
+    chapter_number DECIMAL(10,2) NOT NULL,
+    title TEXT,
+    release_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (manga_id, chapter_number)
+);
+CREATE INDEX IF NOT EXISTS idx_chapters_manga_id ON chapters(manga_id, chapter_number DESC);

@@ -24,7 +24,7 @@ func NewGenreHandler(svc service.GenreService) *GenreHandler {
 
 func (h *GenreHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/", middleware.RequireScopes("read:genre"), h.List)
-	rg.POST("/", middleware.RequireScopes("write:genre"), h.Create)
+	rg.POST("/", middleware.RequireScopes("write:genre"), middleware.RequireAdmin(), h.Create)
 
 	// new route: GET /api/genres/:id/mangas
 	rg.GET("/:id/mangas", middleware.RequireScopes("read:manga"), h.GetMangasByGenre)
@@ -81,9 +81,10 @@ func (h *GenreHandler) GetMangasByGenre(c *gin.Context) {
 		return
 	}
 
-	resp := make([]dto.MangaResponse, 0, len(list))
+	// Use basic response with only essential fields (same as List endpoint)
+	resp := make([]dto.MangaBasicResponse, 0, len(list))
 	for _, m := range list {
-		resp = append(resp, dto.FromModelToResponse(m))
+		resp = append(resp, dto.FromModelToBasicResponse(m))
 	}
 	c.JSON(http.StatusOK, resp)
 }
