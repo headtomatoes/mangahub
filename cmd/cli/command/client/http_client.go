@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"mangahub/cmd/cli/dto"
 	"net/http"
 	"time"
 )
@@ -16,49 +17,6 @@ type HTTPClient struct {
 	baseURL    string
 	httpClient *http.Client
 	token      string
-}
-
-// request structure for HTTP client
-type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-type RegisterRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-}
-
-// response structure for HTTP client
-type AuthResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	UserID       string `json:"user_id"`
-	Username     string `json:"username"`
-	ExpiresIn    int64  `json:"expires_in"`
-}
-type RegisterResponse struct {
-	Username string `json:"username"`
-	Message  string `json:"message"`
-}
-
-type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
-type RefreshResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int64  `json:"expires_in"`
-}
-
-type RevokeTokenRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
-type RevokeTokenResponse struct {
-	Message string `json:"message"`
 }
 
 // Struct for mangas and genres:
@@ -145,7 +103,7 @@ func (c *HTTPClient) SetToken(token string) {
 }
 
 // login method for HTTP client
-func (c *HTTPClient) Login(request *LoginRequest) (*AuthResponse, error) {
+func (c *HTTPClient) Login(request *dto.LoginRequest) (*dto.AuthResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -162,7 +120,7 @@ func (c *HTTPClient) Login(request *LoginRequest) (*AuthResponse, error) {
 		return nil, fmt.Errorf("login failed with status: %s", response.Status)
 	}
 
-	var result AuthResponse
+	var result dto.AuthResponse
 
 	// if decoding the response fails, return error
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
@@ -172,7 +130,7 @@ func (c *HTTPClient) Login(request *LoginRequest) (*AuthResponse, error) {
 }
 
 // register method for HTTP client
-func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, error) {
+func (c *HTTPClient) Register(request *dto.RegisterRequest) (*dto.RegisterResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -189,7 +147,7 @@ func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, erro
 		return nil, fmt.Errorf("registration failed with status: %s", response.Status)
 	}
 
-	var result RegisterResponse
+	var result dto.RegisterResponse
 	// if decoding the response fails, return error
 	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
 		return nil, err
@@ -198,7 +156,7 @@ func (c *HTTPClient) Register(request *RegisterRequest) (*RegisterResponse, erro
 }
 
 // refresh token method for HTTP client
-func (c *HTTPClient) RefreshToken(request *RefreshTokenRequest) (*RefreshResponse, error) {
+func (c *HTTPClient) RefreshToken(request *dto.RefreshTokenRequest) (*dto.RefreshResponse, error) {
 	body := map[string]string{"refresh_token": request.RefreshToken} // prepare request body
 	jsonData, err := json.Marshal(body)                              // marshal to JSON
 	if err != nil {
@@ -218,7 +176,7 @@ func (c *HTTPClient) RefreshToken(request *RefreshTokenRequest) (*RefreshRespons
 		return nil, fmt.Errorf("refresh failed: %s", resp.Status)
 	}
 
-	var result RefreshResponse
+	var result dto.RefreshResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Println("Failed to decode refresh token response:", err)
 		return nil, err
@@ -228,7 +186,7 @@ func (c *HTTPClient) RefreshToken(request *RefreshTokenRequest) (*RefreshRespons
 }
 
 // revoke token method for HTTP client
-func (c *HTTPClient) RevokeToken(request *RevokeTokenRequest) (*RevokeTokenResponse, error) {
+func (c *HTTPClient) RevokeToken(request *dto.RevokeTokenRequest) (*dto.RevokeTokenResponse, error) {
 	body := map[string]string{"refresh_token": request.RefreshToken}
 	jsonData, err := json.Marshal(body)
 	if err != nil {
@@ -243,7 +201,7 @@ func (c *HTTPClient) RevokeToken(request *RevokeTokenRequest) (*RevokeTokenRespo
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("revoke failed: %s", resp.Status)
 	}
-	var result RevokeTokenResponse
+	var result dto.RevokeTokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -555,37 +513,8 @@ func (c *HTTPClient) RemoveFromLibrary(mangaID int64) error {
 	return nil
 }
 
-// Progress-related structures
-type UpdateProgressRequest struct {
-	UserID  string `json:"user_id"`
-	MangaID int64  `json:"manga_id"`
-	Chapter int    `json:"chapter"`
-	Status  string `json:"status"`
-	Volume  *int   `json:"volume,omitempty"`
-	Notes   string `json:"notes,omitempty"`
-}
-
-type ProgressResponse struct {
-	UserID          string    `json:"user_id"`
-	MangaID         int64     `json:"manga_id"`
-	MangaTitle      string    `json:"manga_title,omitempty"`
-	Chapter         int       `json:"chapter"`
-	Volume          *int      `json:"volume,omitempty"`
-	Status          string    `json:"status"`
-	Notes           string    `json:"notes,omitempty"`
-	PreviousChapter int       `json:"previous_chapter,omitempty"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	TotalChapters   *int      `json:"total_chapters,omitempty"`
-	ReadingStreak   int       `json:"reading_streak,omitempty"`
-}
-
-type ProgressHistoryResponse struct {
-	History []ProgressResponse `json:"history"`
-	Total   int                `json:"total"`
-}
-
 // Progress methods
-func (c *HTTPClient) GetProgress(mangaID int64) (*ProgressResponse, error) {
+func (c *HTTPClient) GetProgress(mangaID int64) (*dto.ProgressResponse, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/progress/%d", c.baseURL, mangaID), nil)
 	if err != nil {
 		return nil, err
@@ -606,14 +535,14 @@ func (c *HTTPClient) GetProgress(mangaID int64) (*ProgressResponse, error) {
 		return nil, fmt.Errorf("failed to get progress: %s", resp.Status)
 	}
 
-	var result ProgressResponse
+	var result dto.ProgressResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-func (c *HTTPClient) UpdateProgress(request *UpdateProgressRequest) (*ProgressResponse, error) {
+func (c *HTTPClient) UpdateProgress(request *dto.UpdateProgressRequest) (*dto.ProgressResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -636,17 +565,19 @@ func (c *HTTPClient) UpdateProgress(request *UpdateProgressRequest) (*ProgressRe
 		return nil, fmt.Errorf("failed to update progress: %s", resp.Status)
 	}
 
-	var result ProgressResponse
+	var result dto.ProgressResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-func (c *HTTPClient) GetProgressHistory(mangaID *int64) (*ProgressHistoryResponse, error) {
-	url := c.baseURL + "/api/progress/history"
+func (c *HTTPClient) GetProgressHistory(mangaID *int64) (*dto.ProgressHistoryResponse, error) {
+	// Fixed: Server endpoint is /api/progress, not /api/progress/history
+	url := c.baseURL + "/api/progress"
 	if mangaID != nil {
-		url = fmt.Sprintf("%s?manga_id=%d", url, *mangaID)
+		// If manga_id is provided, get specific progress: GET /api/progress/:manga_id
+		url = fmt.Sprintf("%s/%d", c.baseURL+"/api/progress", *mangaID)
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -665,7 +596,21 @@ func (c *HTTPClient) GetProgressHistory(mangaID *int64) (*ProgressHistoryRespons
 		return nil, fmt.Errorf("failed to get progress history: %s", resp.Status)
 	}
 
-	var result ProgressHistoryResponse
+	// Handle different response types
+	if mangaID != nil {
+		// Single progress response, wrap it in history response
+		var singleProgress dto.ProgressResponse
+		if err := json.NewDecoder(resp.Body).Decode(&singleProgress); err != nil {
+			return nil, err
+		}
+		return &dto.ProgressHistoryResponse{
+			History: []dto.ProgressResponse{singleProgress},
+			Total:   1,
+		}, nil
+	}
+
+	// Multiple progress response (already wrapped)
+	var result dto.ProgressHistoryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}

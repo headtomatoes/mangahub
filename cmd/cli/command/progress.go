@@ -3,6 +3,8 @@ package command
 import (
 	"fmt"
 	"mangahub/cmd/cli/command/client"
+	"mangahub/cmd/cli/dto"
+	"os"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -23,8 +25,8 @@ var progressUpdateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		mangaIDStr, _ := cmd.Flags().GetString("manga-id")
 		chapter, _ := cmd.Flags().GetInt("chapter")
-		volume, _ := cmd.Flags().GetInt("volume")
-		notes, _ := cmd.Flags().GetString("notes")
+		// volume, _ := cmd.Flags().GetInt("volume")
+		// notes, _ := cmd.Flags().GetString("notes")
 		status, _ := cmd.Flags().GetString("status")
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -46,7 +48,7 @@ var progressUpdateCmd = &cobra.Command{
 		}
 
 		// Validate chapter
-		if chapter <= 0 {
+		if chapter < 0 {
 			return fmt.Errorf("--chapter must be a positive number")
 		}
 
@@ -59,12 +61,11 @@ var progressUpdateCmd = &cobra.Command{
 		validStatuses := map[string]bool{
 			"reading":      true,
 			"completed":    true,
-			"on-hold":      true,
 			"dropped":      true,
-			"plan-to-read": true,
+			"plan_to_read": true,
 		}
 		if !validStatuses[status] {
-			return fmt.Errorf("invalid status: %s (valid: reading, completed, on-hold, dropped, plan-to-read)", status)
+			return fmt.Errorf("invalid status: %s (valid: reading, completed, dropped, plan_to_read)", status)
 		}
 
 		httpClient := GetAuthenticatedClient()
@@ -91,17 +92,17 @@ var progressUpdateCmd = &cobra.Command{
 		fmt.Println("Updating reading progress...")
 
 		// Prepare request
-		var volumePtr *int
-		if volume > 0 {
-			volumePtr = &volume
-		}
-
-		req := &client.UpdateProgressRequest{
-			MangaID: mangaID,
-			Chapter: chapter,
-			Status:  status,
-			Volume:  volumePtr,
-			Notes:   notes,
+		// var volumePtr *int
+		// if volume > 0 {
+		// 	volumePtr = &volume
+		// }
+		req := &dto.UpdateProgressRequest{
+			MangaID:    mangaID,
+			MangaTitle: manga.Title,
+			Chapter:    chapter,
+			Status:     status,
+			//Volume:  volumePtr,
+			//Notes:   notes,
 		}
 
 		// Update progress
@@ -126,11 +127,11 @@ var progressUpdateCmd = &cobra.Command{
 			fmt.Printf("Current: Chapter %s\n", formatNumber(chapter))
 		}
 
-		if volume > 0 {
-			fmt.Printf("Volume: %d\n", volume)
-		}
+		// if volume > 0 {
+		// 	fmt.Printf("Volume: %d\n", volume)
+		// }
 
-		fmt.Printf("Updated: %s\n", progress.UpdatedAt.Format("2006-01-02 15:04:05 MST"))
+		fmt.Printf("Updated: %s\n", progress.UpdatedAt)
 
 		// Sync status (simulated for now)
 		fmt.Println("\nSync Status:")
@@ -201,20 +202,14 @@ var progressHistoryCmd = &cobra.Command{
 				fmt.Printf("Progress History for: %s\n\n", manga.Title)
 			}
 		} else {
-			fmt.Println("Progress History (All Manga)\n")
+			fmt.Println("Progress History (All Manga)")
 		}
 
 		for i, progress := range history.History {
 			fmt.Printf("[%d] Chapter %s", i+1, formatNumber(progress.Chapter))
-			if progress.Volume != nil {
-				fmt.Printf(" (Vol. %d)", *progress.Volume)
-			}
-			fmt.Printf(" - %s\n", progress.UpdatedAt.Format("2006-01-02 15:04"))
+			fmt.Printf(" - %s\n", progress.UpdatedAt)
 			if progress.Status != "" {
 				fmt.Printf("    Status: %s\n", progress.Status)
-			}
-			if progress.Notes != "" {
-				fmt.Printf("    Notes: %s\n", progress.Notes)
 			}
 			if progress.MangaTitle != "" && mangaID == nil {
 				fmt.Printf("    Manga: %s\n", progress.MangaTitle)
@@ -230,12 +225,92 @@ var progressHistoryCmd = &cobra.Command{
 // progressSyncCmd represents the progress sync command
 var progressSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Manually sync progress with server",
-	Long:  `Force a manual sync of your progress with the server.`,
+	Short: "Manually sync progress with TCP server",
+	Long:  `Force a manual sync of your progress with the TCP sync server.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Syncing progress with server...")
-		fmt.Println("⚠ TCP sync not yet implemented")
-		fmt.Println("Use 'mangahub sync connect' to establish TCP connection")
+		mangaIDStr, _ := cmd.Flags().GetString("manga-id")
+		chapter, _ := cmd.Flags().GetInt("chapter")
+		status, _ := cmd.Flags().GetString("status")
+
+		// Validate manga ID
+		if mangaIDStr == "" {
+			return fmt.Errorf("--manga-id is required")
+		}
+
+		mangaID, err := strconv.ParseInt(mangaIDStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid manga-id: %w", err)
+		}
+
+		if chapter < 0 {
+			return fmt.Errorf("--chapter must be a positive number")
+		}
+
+		if status == "" {
+			status = "reading"
+		}
+
+		// Validate status
+		validStatuses := map[string]bool{
+			"reading":      true,
+			"completed":    true,
+			"dropped":      true,
+			"plan_to_read": true,
+		}
+		if !validStatuses[status] {
+			return fmt.Errorf("invalid status: %s (valid: reading, completed, dropped, plan_to_read)", status)
+		}
+
+		// Check TCP connection
+		if tcpClient == nil || !tcpClient.IsConnected() {
+			// Establish temporary connection for sync
+			fmt.Println("Establishing temporary TCP connection...")
+
+			tcpServer := "localhost:8081"
+			if v := os.Getenv("MANGAHUB_TCP_SERVER"); v != "" {
+				tcpServer = v
+			}
+
+			tempClient := client.NewTCPClient(tcpServer)
+			username := GetCurrentUsername()
+			if username == "" {
+				return fmt.Errorf("not authenticated, please login first")
+			}
+
+			// Get access token
+			token := accessToken
+
+			err := tempClient.Connect(username, token)
+			if err != nil {
+				return fmt.Errorf("failed to connect to TCP server: %w", err)
+			}
+			defer tempClient.Disconnect()
+
+			fmt.Println("✓ Connected to TCP server")
+			tcpClient = tempClient
+		}
+
+		fmt.Printf("\nSyncing progress to TCP server...\n")
+		fmt.Printf("  Manga ID: %d\n", mangaID)
+		fmt.Printf("  Chapter: %d\n", chapter)
+		fmt.Printf("  Status: %s\n", status)
+
+		// Get current user ID
+		userID := GetCurrentUserID()
+		if userID == "" {
+			return fmt.Errorf("not logged in or user ID not found")
+		}
+
+		// Send progress update via TCP
+		err = tcpClient.SendProgressUpdate(mangaID, chapter, status, userID)
+		if err != nil {
+			return fmt.Errorf("failed to sync: %w", err)
+		}
+
+		fmt.Println("\n✓ Progress synced successfully via TCP!")
+		fmt.Println("\nNote: This updates the TCP sync server cache (Redis).")
+		fmt.Println("For persistent storage, use: mangahub progress update")
+
 		return nil
 	},
 }
@@ -285,11 +360,18 @@ func init() {
 	progressUpdateCmd.Flags().Int("chapter", 0, "Current chapter (required)")
 	progressUpdateCmd.Flags().Int("volume", 0, "Current volume (optional)")
 	progressUpdateCmd.Flags().String("notes", "", "Notes about this chapter (optional)")
-	progressUpdateCmd.Flags().String("status", "reading", "Reading status (reading, completed, on-hold, dropped, plan-to-read)")
+	progressUpdateCmd.Flags().String("status", "reading", "Reading status (reading, completed, dropped, plan_to_read)")
 	progressUpdateCmd.Flags().Bool("force", false, "Force update even if chapter is behind current progress")
 	progressUpdateCmd.MarkFlagRequired("manga-id")
 	progressUpdateCmd.MarkFlagRequired("chapter")
 
 	// Progress history flags
 	progressHistoryCmd.Flags().String("manga-id", "", "Manga ID or slug (optional, shows all if not specified)")
+
+	// Progress sync flags
+	progressSyncCmd.Flags().String("manga-id", "", "Manga ID (required)")
+	progressSyncCmd.Flags().Int("chapter", 0, "Current chapter (required)")
+	progressSyncCmd.Flags().String("status", "reading", "Reading status (reading, completed, dropped, plan_to_read)")
+	progressSyncCmd.MarkFlagRequired("manga-id")
+	progressSyncCmd.MarkFlagRequired("chapter")
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"mangahub/cmd/cli/authentication"
 	"mangahub/cmd/cli/command/client"
+	"mangahub/cmd/cli/dto"
 	"os"
 
 	"time"
@@ -57,7 +58,7 @@ Use "mangahubCLI command -help" or "mangahubCLI command -h" to see all available
 		now := time.Now().Unix()
 		if now >= (creds.ExpiresAt - refreshBuffer) { // now >= expiry - buffer time
 			httpClient := client.NewHTTPClient(apiURL)
-			req := &client.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
+			req := &dto.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
 
 			refreshResp, err := httpClient.RefreshToken(req)
 			if err != nil {
@@ -129,4 +130,13 @@ func GetAuthenticatedClient() *client.HTTPClient {
 // GetCurrentUsername returns the username of the currently logged-in user
 func GetCurrentUsername() string {
 	return currentUsername
+}
+
+// GetCurrentUserID returns the user ID of the currently logged-in user
+func GetCurrentUserID() string {
+	creds, err := authentication.GetTokens()
+	if err != nil {
+		return ""
+	}
+	return creds.UserID
 }

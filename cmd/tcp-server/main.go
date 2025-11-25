@@ -32,7 +32,8 @@ func main() {
 	}
 
 	// Build TCP address from config
-	tcpAddr := fmt.Sprintf("localhost:%d", cfg.TCPPort)
+	// Use 0.0.0.0 to accept connections from outside the container
+	tcpAddr := fmt.Sprintf("0.0.0.0:%d", cfg.TCPPort)
 
 	// Parse Redis URL to get address (remove redis:// prefix if present)
 	redisAddr := cfg.RedisURL

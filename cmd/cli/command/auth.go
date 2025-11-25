@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mangahub/cmd/cli/authentication"
 	"mangahub/cmd/cli/command/client"
+	"mangahub/cmd/cli/dto"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -25,7 +26,7 @@ var registerCmd = &cobra.Command{
 	Short: "Register a new MangaHub account",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// get data from flags
-		var c client.RegisterRequest
+		var c dto.RegisterRequest
 		c.Username, _ = cmd.Flags().GetString("username")
 		c.Password, _ = cmd.Flags().GetString("password")
 		c.Email, _ = cmd.Flags().GetString("email")
@@ -50,7 +51,7 @@ var loginCmd = &cobra.Command{
 	Short: "Login to your MangaHub account",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// get data from flags
-		var c client.LoginRequest
+		var c dto.LoginRequest
 		c.Username, _ = cmd.Flags().GetString("username")
 		c.Password, _ = cmd.Flags().GetString("password")
 
@@ -66,6 +67,7 @@ var loginCmd = &cobra.Command{
 		err = authentication.StoreTokens(&authentication.StoredCredentials{
 			AccessToken:  response.AccessToken,
 			RefreshToken: response.RefreshToken,
+			UserID:       response.UserID,
 			Username:     c.Username,
 			ExpiresAt:    now + response.ExpiresIn,
 		})
@@ -89,7 +91,7 @@ var autologinCmd = &cobra.Command{
 			return fmt.Errorf("not logged in, please run 'mangahub auth login'")
 		}
 		httpClient := client.NewHTTPClient(apiURL) // create new HTTP client
-		req := &client.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
+		req := &dto.RefreshTokenRequest{RefreshToken: creds.RefreshToken}
 		// if token is expired, refresh it
 		now := time.Now().Unix()
 		if now >= (creds.ExpiresAt - refreshBuffer) {
@@ -137,7 +139,7 @@ var revokeTokenCmd = &cobra.Command{
 		}
 		// call API to revoke refresh token
 		httpClient := client.NewHTTPClient(apiURL) // create new HTTP client
-		req := &client.RevokeTokenRequest{RefreshToken: creds.RefreshToken}
+		req := &dto.RevokeTokenRequest{RefreshToken: creds.RefreshToken}
 		_, err = httpClient.RevokeToken(req)
 		if err != nil {
 			return fmt.Errorf("failed to revoke token: %w", err)

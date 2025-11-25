@@ -176,7 +176,7 @@ func (c *TCPClient) GetStats() ConnectionStats {
 }
 
 // SendProgressUpdate sends a progress update to the server
-func (c *TCPClient) SendProgressUpdate(mangaID int64, chapter int, status string) error {
+func (c *TCPClient) SendProgressUpdate(mangaID int64, chapter int, status, userID string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -187,6 +187,7 @@ func (c *TCPClient) SendProgressUpdate(mangaID int64, chapter int, status string
 	msg := TCPMessage{
 		Type: "progress_update",
 		Data: map[string]any{
+			"user_id":  userID,
 			"manga_id": mangaID,
 			"chapter":  chapter,
 			"status":   status,
