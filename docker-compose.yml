@@ -141,6 +141,39 @@ services:
     networks:
       - mangahub-network
 
+  # MangaDex Sync Service
+  mangadex-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${GO_ENV:-development}
+    container_name: mangahub-mangadex-sync
+    restart: always
+    depends_on:
+      - db
+      - udp-server
+    volumes:
+      - .:/app
+      - /app/tmp
+    environment:
+      - GO_ENV=${GO_ENV:-development}
+      - DATABASE_URL=${DATABASE_URL}
+      - MANGADEX_API_KEY=${MANGADX_API_KEY}
+      - UDP_SERVER_URL=http://udp-server:8085
+      - MANGA_SYNC_INITIAL=${MANGA_SYNC_INITIAL:-true}
+      - MANGA_SYNC_INITIAL_COUNT=${MANGA_SYNC_INITIAL_COUNT:-150}
+      - MANGA_SYNC_RATE_CONCURRENCY=${MANGA_SYNC_RATE_CONCURRENCY:-5}
+    command: ["air", "-c", ".air.mangadex-sync.toml"]
+    networks:
+      - mangahub-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    # Add extra_hosts to help with DNS resolution
+    extra_hosts:
+      - "api.mangadex.org:104.18.13.77"
+      - "host.docker.internal:host-gateway"
+
   # Prometheus (Optional monitoring)
   prometheus:
     image: prom/prometheus:latest
