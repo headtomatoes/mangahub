@@ -12,3 +12,7 @@ type RefreshToken struct {
 	CreatedAt time.Time `json:"created_at"`
 	Revoked   bool      `gorm:"default:false" json:"revoked"`
 }
+
+// func (RefreshToken) TableName() string {
+// 	return "refresh_tokens"
+// }

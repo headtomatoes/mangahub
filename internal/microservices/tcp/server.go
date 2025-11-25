@@ -202,7 +202,8 @@ func (s *TCPServer) authenticateClient(client *ClientConnection) bool {
 	// Set authentication deadline (10 seconds)
 	client.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 
-	// Read initial auth message
+	// Read initial auth message using the client's writer's underlying reader
+	// to avoid buffer conflicts
 	reader := bufio.NewReader(client.conn)
 	line, err := reader.ReadBytes('\n')
 	if err != nil {
@@ -234,8 +235,16 @@ func (s *TCPServer) authenticateClient(client *ClientConnection) bool {
 	userID, username, err := s.AuthService.ValidateToken(token)
 	if err != nil {
 		s.logger.Warn("token_validation_failed", "error", err.Error())
-		// Send auth failure response
-		client.Send([]byte(`{"type":"auth_response","success":false,"error":"invalid token"}`))
+		// Send auth failure response directly to connection
+		failMsg := Message{
+			Type: "auth_error",
+			Data: map[string]any{
+				"error": "invalid token",
+			},
+		}
+		failJSON, _ := json.Marshal(failMsg)
+		failJSON = append(failJSON, '\n')
+		client.conn.Write(failJSON)
 		return false
 	}
 
@@ -244,8 +253,18 @@ func (s *TCPServer) authenticateClient(client *ClientConnection) bool {
 	client.Username = username
 	client.Authenticated = true
 
-	// Send auth success response
-	client.Send([]byte(fmt.Sprintf(`{"type":"auth_response","success":true,"user_id":"%s","username":"%s"}`, userID, username)))
+	// Send auth success response directly to connection
+	successMsg := Message{
+		Type: "auth_success",
+		Data: map[string]any{
+			"session_id": client.ID,
+			"user_id":    userID,
+			"username":   username,
+		},
+	}
+	successJSON, _ := json.Marshal(successMsg)
+	successJSON = append(successJSON, '\n')
+	client.conn.Write(successJSON)
 
 	// Reset deadline for normal operations
 	client.conn.SetReadDeadline(time.Now().Add(MaxDeadlineDuration))

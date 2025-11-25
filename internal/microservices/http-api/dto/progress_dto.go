@@ -8,10 +8,10 @@ type GetProgressByMangaIDRequest struct {
 }
 
 type UpdateProgressRequest struct {
-	UserID  string `json:"user_id" binding:"required,uuid"`
-	MangaID int64  `json:"manga_id" binding:"required,gt=0"`
-	Chapter int    `json:"chapter" binding:"required,min=0"`
-	Status  string `json:"status" binding:"required,oneof=reading completed on-hold dropped plan-to-read"`
+	MangaID    int64  `json:"manga_id" binding:"required,gt=0"`
+	MangaTitle string `json:"manga_title,omitempty"`
+	Chapter    int    `json:"chapter" binding:"required,min=0"`
+	Status     string `json:"status" binding:"required,oneof=reading completed plan_to_read dropped"`
 }
 
 type DeleteProgressRequest struct {
@@ -20,10 +20,15 @@ type DeleteProgressRequest struct {
 }
 
 type ProgressResponse struct {
-	UserID    string `json:"user_id"`
-	MangaID   int64  `json:"manga_id"`
-	Chapter   int    `json:"chapter"`
-	Status    string `json:"status"`
-	UpdatedAt string `json:"updated_at"`
-	CreatedAt string `json:"created_at"`
+	UserID     string `json:"user_id"`
+	MangaID    int64  `json:"manga_id"`
+	MangaTitle string `json:"manga_title,omitempty"` // Optional, not in DB yet
+	Chapter    int    `json:"chapter"`
+	Status     string `json:"status"`
+	UpdatedAt  string `json:"updated_at"`
+}
+
+type ProgressHistoryResponse struct {
+	History []ProgressResponse `json:"history"`
+	Total   int                `json:"total"`
 }
