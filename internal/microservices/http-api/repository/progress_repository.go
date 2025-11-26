@@ -40,15 +40,26 @@ func (r *progressRepository) GetProgressByMangaID(ctx context.Context, userID st
 
 // Upsert progress record
 func (r *progressRepository) UpdateProgress(ctx context.Context, progress *models.UserProgress) error {
-	result := r.db.WithContext(ctx).
+	// Try to find existing progress
+	var existing models.UserProgress
+	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND manga_id = ?", progress.UserID, progress.MangaID).
-		Assign(map[string]any{
-			"current_chapter": progress.CurrentChapter,
-			"status":          progress.Status,
-			"updated_at":      time.Now(),
-		}).
-		FirstOrCreate(progress)
-	return result.Error
+		First(&existing).Error
+
+	if err == gorm.ErrRecordNotFound {
+		// Create new record
+		progress.UpdatedAt = time.Now()
+		return r.db.WithContext(ctx).Create(progress).Error
+	} else if err != nil {
+		return err
+	}
+
+	// Update existing record
+	return r.db.WithContext(ctx).Model(&existing).Updates(map[string]any{
+		"current_chapter": progress.CurrentChapter,
+		"status":          progress.Status,
+		"updated_at":      time.Now(),
+	}).Error
 }
 func (r *progressRepository) DeleteProgress(ctx context.Context, userID string, mangaID int64) error {
 	if err := r.db.WithContext(ctx).Where("user_id = ? AND manga_id = ?", userID, mangaID).Delete(&models.UserProgress{}).Error; err != nil {
