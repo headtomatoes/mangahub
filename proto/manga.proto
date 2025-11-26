@@ -40,7 +40,19 @@ message GetMangaResponse {
     Manga manga = 1;
 }
 
-
+// UpdateProgressRequest
+message UpdateProgressRequest {
+    string user_id = 1;
+    int64 manga_id = 2;
+    string manga_title = 3;
+    int32 chapter = 4;
+    string status = 5; // e.g., "reading", "completed", "on_hold"
+}
+// UpdateProgressResponse
+message UpdateProgressResponse {
+    bool success = 1;
+    string message = 2;
+}
 
 // MangaService defines RPC methods
 service MangaService {
@@ -51,5 +63,5 @@ service MangaService {
     rpc SearchManga(SearchRequest) returns (SearchResponse);
     
     // Update user progress (called internally)
-    // rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
+    rpc UpdateProgress(UpdateProgressRequest) returns (UpdateProgressResponse);
 }
