@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -119,7 +120,27 @@ func (s *MangaServiceServer) SearchManga(ctx context.Context, req *pb.SearchRequ
 	return resp, nil
 }
 
-// UpdateProgress left as stub or implement similarly
+// UpdateProgress implements MangaService.UpdateProgress
+func (s *MangaServiceServer) UpdateProgress(ctx context.Context, req *pb.UpdateProgressRequest) (*pb.UpdateProgressResponse, error) {
+	err := s.progressRepo.UpdateProgress(ctx, &models.UserProgress{
+		UserID:         req.GetUserId(),
+		MangaID:        req.GetMangaId(),
+		CurrentChapter: int(req.GetChapter()),
+		Status:         req.GetStatus(),
+		UpdatedAt:      time.Now().UTC(),
+	})
+	if err != nil {
+		return &pb.UpdateProgressResponse{
+			Success: false,
+			Message: fmt.Sprintf("failed to update: %v", err),
+		}, nil
+	}
+
+	return &pb.UpdateProgressResponse{
+		Success: true,
+		Message: "Progress updated successfully",
+	}, nil
+}
 
 // StartGRPCServer starts the gRPC server
 func StartGRPCServer(addr string, mangaRepo *rp.MangaRepo, progressRepo rp.ProgressRepository) error {

@@ -18,10 +18,10 @@ import (
 const refreshBuffer = 5 * 60 // 5 minutes in seconds
 
 var (
-	apiURL           string                                                            //Global flag for API server URL
-	skipAuthCommands = map[string]bool{"auth": true, "help": true, "completion": true} // Commands that skip authentication
-	accessToken      string                                                            // Global variable to hold the access token for the session
-	currentUsername  string                                                            // Global variable to hold the current username
+	apiURL           string                                                                         //Global flag for API server URL
+	skipAuthCommands = map[string]bool{"auth": true, "help": true, "completion": true, "grpc": true} // Commands that skip authentication
+	accessToken      string                                                                         // Global variable to hold the access token for the session
+	currentUsername  string                                                                         // Global variable to hold the current username
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -118,6 +118,7 @@ func init() {
 	rootCmd.AddCommand(ratingCmd)
 	rootCmd.AddCommand(commentCmd)
 	rootCmd.AddCommand(genreCmd)
+	rootCmd.AddCommand(grpcCmd)
 }
 
 // GetAuthenticatedClient returns an HTTP client with the current access token
