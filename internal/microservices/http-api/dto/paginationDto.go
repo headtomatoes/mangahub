@@ -8,6 +8,14 @@ type PaginatedMangaResponse struct {
 	TotalPages int             `json:"total_pages"`
 }
 
+type PaginatedMangaBasicResponse struct {
+	Data       []MangaBasicResponse `json:"data"`
+	Page       int                  `json:"page"`
+	PageSize   int                  `json:"page_size"`
+	Total      int64                `json:"total"`
+	TotalPages int                  `json:"total_pages"`
+}
+
 func NewPaginatedMangaResponse(data []MangaResponse, page, pageSize int, total int64) PaginatedMangaResponse {
 	totalPages := int(total) / pageSize
 	if int(total)%pageSize != 0 {
@@ -15,6 +23,21 @@ func NewPaginatedMangaResponse(data []MangaResponse, page, pageSize int, total i
 	}
 
 	return PaginatedMangaResponse{
+		Data:       data,
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+	}
+}
+
+func NewPaginatedMangaBasicResponse(data []MangaBasicResponse, page, pageSize int, total int64) PaginatedMangaBasicResponse {
+	totalPages := int(total) / pageSize
+	if int(total)%pageSize != 0 {
+		totalPages++
+	}
+
+	return PaginatedMangaBasicResponse{
 		Data:       data,
 		Page:       page,
 		PageSize:   pageSize,

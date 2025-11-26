@@ -147,3 +147,41 @@ func RequireAnyScope(scopes ...string) gin.HandlerFunc {
 		c.Abort()
 	}
 }
+
+// RequireRole checks if the user has the specified role
+func RequireRole(requiredRole string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get role from context (set by AuthMiddleware)
+		roleInterface, exists := c.Get("role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Role not found in token"})
+			c.Abort()
+			return
+		}
+
+		userRole, ok := roleInterface.(string)
+		if !ok {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid role format"})
+			c.Abort()
+			return
+		}
+
+		// Check if user has the required role
+		if userRole != requiredRole {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":    "Insufficient permissions",
+				"required": requiredRole,
+				"current":  userRole,
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequireAdmin is a convenience function for requiring admin role
+func RequireAdmin() gin.HandlerFunc {
+	return RequireRole("admin")
+}
