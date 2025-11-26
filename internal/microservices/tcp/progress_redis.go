@@ -10,11 +10,13 @@ import (
 )
 
 type ProgressData struct {
-	UserID     string    `json:"user_id"`
-	MangaID    int64     `json:"manga_id"` // Changed from string to int64 for consistency
-	Chapter    int64     `json:"chapter"`  // Changed from int to int64
-	LastReadAt time.Time `json:"last_read_at"`
-	Status     string    `json:"status"` // "reading", "completed", "on_hold"
+	ID             int64     `json:"id,omitempty"`
+	UserID         string    `json:"user_id"`
+	MangaID        int64     `json:"manga_id"`
+	CurrentChapter int       `json:"current_chapter"`  // Match DB: integer not int64
+	Status         string    `json:"status"`           // reading|completed|plan_to_read|dropped
+	Rating         *int      `json:"rating,omitempty"` // Optional: 1-10
+	UpdatedAt      time.Time `json:"updated_at"`       // Match DB: updated_at not last_read_at
 }
 
 type ProgressRedisRepo struct {
@@ -57,12 +59,15 @@ func (r *ProgressRedisRepo) SaveProgress(data *ProgressData) error {
 
 	// Convert struct to a map[string]any for HSET
 	fields := map[string]any{
-		"user_id":  data.UserID,
-		"manga_id": data.MangaID,
-		"chapter":  data.Chapter,
-		//"page":         data.Page,
-		"last_read_at": data.LastReadAt.Format(time.RFC3339Nano),
-		"status":       data.Status,
+		"user_id":         data.UserID,
+		"manga_id":        data.MangaID,
+		"current_chapter": data.CurrentChapter,
+		"status":          data.Status,
+		"updated_at":      data.UpdatedAt.Format(time.RFC3339Nano),
+	}
+	// Add rating if provided
+	if data.Rating != nil {
+		fields["rating"] = *data.Rating
 	}
 
 	// Use HSET to set all fields in the hash
@@ -98,14 +103,22 @@ func (r *ProgressRedisRepo) GetProgress(userID string, mangaID int64) (*Progress
 		Status:  fields["status"],
 	}
 
-	// Parse chapter as int64
-	if ch, ok := fields["chapter"]; ok {
-		fmt.Sscanf(ch, "%d", &data.Chapter)
+	// Parse current_chapter as int
+	if ch, ok := fields["current_chapter"]; ok {
+		fmt.Sscanf(ch, "%d", &data.CurrentChapter)
+	}
+
+	// Parse rating if present
+	if r, ok := fields["rating"]; ok {
+		var rating int
+		if _, err := fmt.Sscanf(r, "%d", &rating); err == nil {
+			data.Rating = &rating
+		}
 	}
 
 	// Parse timestamp
-	if ts, ok := fields["last_read_at"]; ok {
-		data.LastReadAt, _ = time.Parse(time.RFC3339Nano, ts)
+	if ts, ok := fields["updated_at"]; ok {
+		data.UpdatedAt, _ = time.Parse(time.RFC3339Nano, ts)
 	}
 
 	return data, nil
@@ -149,13 +162,21 @@ func (r *ProgressRedisRepo) GetUserProgress(userID string) ([]*ProgressData, err
 				MangaID: mangaID,
 				Status:  fields["status"],
 			}
-			// Parse chapter as int64
-			if ch, ok := fields["chapter"]; ok {
-				data.Chapter, _ = strconv.ParseInt(ch, 10, 64)
+			// Parse current_chapter as int
+			if ch, ok := fields["current_chapter"]; ok {
+				if chInt, err := strconv.Atoi(ch); err == nil {
+					data.CurrentChapter = chInt
+				}
+			}
+			// Parse rating if present
+			if r, ok := fields["rating"]; ok {
+				if rating, err := strconv.Atoi(r); err == nil {
+					data.Rating = &rating
+				}
 			}
 			// Parse timestamp
-			if ts, ok := fields["last_read_at"]; ok {
-				data.LastReadAt, _ = time.Parse(time.RFC3339Nano, ts)
+			if ts, ok := fields["updated_at"]; ok {
+				data.UpdatedAt, _ = time.Parse(time.RFC3339Nano, ts)
 			}
 			results = append(results, data)
 		}

@@ -20,12 +20,13 @@ type DeleteProgressRequest struct {
 }
 
 type ProgressResponse struct {
-	UserID     string `json:"user_id"`
-	MangaID    int64  `json:"manga_id"`
-	MangaTitle string `json:"manga_title,omitempty"` // Optional, not in DB yet
-	Chapter    int    `json:"chapter"`
-	Status     string `json:"status"`
-	UpdatedAt  string `json:"updated_at"`
+	UserID      string `json:"user_id"`
+	MangaID     int64  `json:"manga_id"`
+	MangaTitle  string `json:"manga_title,omitempty"`
+	Chapter     int    `json:"chapter"`
+	Status      string `json:"status"`
+	LastChapter int    `json:"last_chapter"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 type ProgressHistoryResponse struct {

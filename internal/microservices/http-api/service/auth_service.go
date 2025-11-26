@@ -161,8 +161,8 @@ func (s *authService) generateAccessTokenWithScopes(user *models.User, customSco
 	scopeByRole := map[string][]string{
 		"admin": {"read:*", "write:*", "delete:*", "admin:*", "library:*"},
 		"user": {
-			"read:manga", "read:library", "read:genre",
-			"write:comment", "write:profile", "write:community_chat", "write:library",
+			"read:manga", "read:library", "read:genre", "read:progress",
+			"write:comment", "write:profile", "write:community_chat", "write:library", "write:progress",
 		},
 	}
 
@@ -200,8 +200,8 @@ func (s *authService) generateAccessTokenWithRequestedScopes(user *models.User, 
 	allowedScopesByRole := map[string][]string{
 		"admin": {"read:*", "write:*", "delete:*", "admin:*", "library:*"},
 		"user": {
-			"read:manga", "read:library", "read:genre",
-			"write:comment", "write:profile", "write:community_chat", "write:library",
+			"read:manga", "read:library", "read:genre", "read:progress",
+			"write:comment", "write:profile", "write:community_chat", "write:library", "write:progress",
 		},
 	}
 	allowed := allowedScopesByRole[user.Role]

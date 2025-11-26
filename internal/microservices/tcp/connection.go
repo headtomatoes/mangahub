@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mangahub/internal/config"
 	"net"
 	"strings"
 	"time"
@@ -134,6 +135,8 @@ func (c *ClientConnection) Listen() {
 		switch msg.Type {
 		case "progress_update":
 			c.HandleProgressMessage(msg.Data)
+		case "auth":
+			c.HandleAuthMessage(msg.Data)
 		default:
 			// Broadcast any valid JSON message (for flexibility and testing)
 			c.Manager.logger.Info("broadcasting_message",
@@ -198,11 +201,11 @@ func (c *ClientConnection) HandleProgressMessage(data map[string]any) {
 	// Save to repository (works with both Redis-only and Hybrid)
 	if c.Manager.progressRepo != nil {
 		progressData := &ProgressData{
-			UserID:     userID,
-			MangaID:    int64(mangaID),
-			Chapter:    int64(chapter),
-			LastReadAt: time.Now(),
-			Status:     "reading",
+			UserID:         userID,
+			MangaID:        int64(mangaID),
+			CurrentChapter: int(chapter),
+			Status:         "reading",
+			UpdatedAt:      time.Now(),
 		}
 
 		if err := c.Manager.progressRepo.SaveProgress(progressData); err != nil {
@@ -258,4 +261,53 @@ func (c *ClientConnection) Send(data []byte) error {
 // method to close the connection
 func (c *ClientConnection) Close() {
 	c.conn.Close()
+}
+
+// method to handle authentication message
+func (c *ClientConnection) HandleAuthMessage(data map[string]any) {
+	// extract token and username
+	token, ok := data["token"].(string)
+	if !ok || token == "" {
+		c.Send([]byte(`{
+		"type":"error",
+		"code":"INVALID_TOKEN",
+		"message":"Missing or invalid token"}`))
+		return
+	}
+	username, ok := data["username"].(string)
+	if !ok || username == "" {
+		c.Send([]byte(`{
+		"type":"error",
+		"code":"INVALID_USERNAME",
+		"message":"Missing or invalid username"}`))
+		return
+	}
+	// get jwt secret from config
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		c.Manager.logger.Error(
+			"config_load_failed",
+			"error", err.Error(),
+		)
+		return
+	}
+	jwtSecret := cfg.JWTSecret
+	// validate token
+	tcpAuthService := NewTCPAuthService(jwtSecret)
+	userID, userName, err := tcpAuthService.ValidateToken(token)
+	if err != nil {
+		c.Manager.logger.Warn(
+			"token_validation_failed",
+			"client_id", c.ID,
+			"error", err.Error(),
+		)
+		c.Send([]byte(`{
+		"type":"error",
+		"code":"TOKEN_INVALID",
+		"message":"Token validation failed"}`))
+		return
+	}
+	c.UserID = userID
+	c.Username = userName
+	c.Authenticated = true
 }

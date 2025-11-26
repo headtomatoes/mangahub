@@ -20,6 +20,7 @@ type StoredCredentials struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	Username     string `json:"username"`
+	UserID       string `json:"user_id"`
 	ExpiresAt    int64  `json:"expires_at"`
 }
 
