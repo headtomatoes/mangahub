@@ -58,7 +58,7 @@ install-tools:
 	@echo "Tools installed successfully!"
 
 ## build: Build all server binaries
-build: build-api build-tcp build-udp build-grpc
+build: build-api build-tcp build-udp build-grpc build-mangadex-sync
 
 ## build-api: Build API server
 build-api:
@@ -87,6 +87,13 @@ build-grpc:
 	@mkdir -p $(BINARY_DIR)
 	go build -o $(GRPC_BINARY) ./cmd/grpc-server
 	@echo "gRPC server built: $(GRPC_BINARY)"
+
+## build-mangadex-sync: Build MangaDex sync service
+build-mangadex-sync:
+	@echo "Building MangaDex sync service..."
+	@mkdir -p $(BINARY_DIR)
+	go build -o $(BINARY_DIR)/mangadex-sync ./cmd/mangadex-sync
+	@echo "MangaDex sync service built: $(BINARY_DIR)/mangadex-sync"
 
 ## docker-up: Start all Docker containers
 docker-up:
