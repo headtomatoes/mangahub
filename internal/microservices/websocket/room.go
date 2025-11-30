@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"log/slog"
 	"sync"
 )
 
@@ -22,20 +23,49 @@ func NewRoom(id int64, title string) *Room {
 }
 
 // AddUser: adds new client to the room
-func (r *Room) AddUser(c *Client) {}
+func (r *Room) AddUser(c *Client) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// check if client already exists
+	if r.Clients[c.ID] == nil {
+		slog.Info("Client added to room", "room_id", r.ID, "client_id", c.ID)
+		r.Clients[c.ID] = c
+	} else {
+		slog.Warn("Client already in room", "room_id", r.ID, "client_id", c.ID)
+	}
+}
 
 // RemoveUser: removes client from the room
-func (r *Room) RemoveUser(c *Client) {}
+func (r *Room) RemoveUser(c *Client) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// check if client exists
+	if r.Clients[c.ID] != nil {
+		slog.Info("Client removed from room", "room_id", r.ID, "client_id", c.ID)
+		delete(r.Clients, c.ID)
+	} else {
+		slog.Warn("Client not found in room", "room_id", r.ID, "client_id", c.ID)
+	}
+}
 
 // Broadcast: broadcasts message to all clients in the room
 func (r *Room) Broadcast(message []byte) {}
 
 // GetUserCount: returns the number of clients in the room
 func (r *Room) GetUserCount() int {
-	return 0
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return len(r.Clients)
 }
 
 // GetClients: returns copy of clients list in the room
 func (r *Room) GetClients() []*Client {
-	return nil
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	// create a tmp slice to hold clients
+	clients := make([]*Client, 0, len(r.Clients))
+	for _, client := range r.Clients {
+		clients = append(clients, client)
+	}
+	return clients
 }

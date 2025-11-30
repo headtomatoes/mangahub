@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"log/slog"
 	"sync"
 )
 
@@ -40,10 +41,39 @@ func NewHub() *Hub {
 }
 
 // Run: starts the Hub's main loop to process incoming channels
-func (h *Hub) Run() {}
+func (h *Hub) Run() {
+	// infinite loop to listen on channels
+	for {
+		// use select case statement to listen on multiple channels then execute corresponding action
+		select {
+		case client := <-h.Register:
+			h.RegisterClient(client)
+		case client := <-h.Unregister:
+			h.UnregisterClient(client)
+		case action := <-h.JoinRoom:
+			h.HandleJoinRoom(action)
+		case action := <-h.LeaveRoom:
+			h.HandleLeaveRoom(action)
+		case message := <-h.Broadcast:
+			h.BroadcastMessage(message)
+			// shut down case can be added later once needed
+		}
+	}
+}
 
 // RegisterClient: registers a new client
-func (h *Hub) RegisterClient(c *Client) {}
+func (h *Hub) RegisterClient(c *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	// check if client already exists
+	// if not, add to clients map
+	if h.Clients[c.ID] == nil {
+		h.Clients[c.ID] = c
+		slog.Info("Client registered", "client_id", c.ID)
+	} else {
+		slog.Warn("Client already registered", "client_id", c.ID)
+	}
+}
 
 // UnregisterClient: unregisters a client
 func (h *Hub) UnregisterClient(c *Client) {}
@@ -58,4 +88,6 @@ func (h *Hub) HandleLeaveRoom(action *RoomActions) {}
 func (h *Hub) BroadcastMessage(message *Message) {}
 
 // GetRoom: retrieves or creates a room by ID
-func (h *Hub) GetRoom(roomID int64) *Room
+func (h *Hub) GetRoom(roomID int64) *Room {
+	return nil
+}

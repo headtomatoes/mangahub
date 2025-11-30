@@ -11,7 +11,6 @@ import (
 // Message types and structures
 type MessageType string
 
-// list of message types
 const ( //trigger when +
 	TypeJoin   MessageType = "join"   // user joins a room
 	TypeLeave  MessageType = "leave"  // user leaves a room
@@ -22,12 +21,12 @@ const ( //trigger when +
 
 // Message structure for WebSocket communication
 type Message struct {
-	Type      MessageType `json:"type"`
-	RoomID    int64       `json:"room_id"`
-	UserID    string      `json:"user_id"`
-	UserName  string      `json:"user_name"`
-	Content   string      `json:"content"`
-	Timestamp time.Time   `json:"timestamp"` //=> tranfers to UTC time
+	Type      MessageType `json:"type"`      // type of message (join, leave, chat, system, typing)
+	RoomID    int64       `json:"room_id"`   // manga ID 1:1 room
+	UserID    string      `json:"user_id"`   // sender user ID
+	UserName  string      `json:"user_name"` // sender user name
+	Content   string      `json:"content"`   // message content
+	Timestamp time.Time   `json:"timestamp"` // time in UTC format
 }
 
 // constructor new message
@@ -54,7 +53,7 @@ func NewSystemMessage(roomID int64, content string) *Message {
 	}
 }
 
-// marshal and unmarshal to json methods
+// ToJSON: marshal Message struct to JSON
 func (m *Message) ToJSON() ([]byte, error) {
 	data, err := json.Marshal(m)
 	if err != nil {
@@ -64,6 +63,7 @@ func (m *Message) ToJSON() ([]byte, error) {
 	return data, nil
 }
 
+// MessageFromJSON: unmarshal JSON data to Message struct
 func MessageFromJSON(data []byte) (*Message, error) {
 	var msg Message
 	err := json.Unmarshal(data, &msg)
