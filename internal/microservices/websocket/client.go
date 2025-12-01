@@ -81,22 +81,21 @@ func (c *Client) ReadPump() {
 			continue
 		}
 
-		// set client info to message
+		// Set client info to message (but preserve RoomID for join messages)
 		message.UserID = c.UserID
 		message.UserName = c.UserName
-		message.RoomID = c.RoomID
 		message.Timestamp = time.Now().UTC()
 
 		// with diff type of message handle accordingly
 		switch message.Type {
 		case TypeJoin:
-			// Update client's room ID from the message
+			// Update client's room ID from the message (don't overwrite it!)
 			c.RoomID = message.RoomID
 			c.Hub.JoinRoom <- &RoomActions{ // send join room action to hub
 				RoomID: message.RoomID,
 				Client: c,
 			}
-			slog.Info("Client joined room", "room_id", message.RoomID, "client_id", c.ID)
+			slog.Info("Client joining room", "room_id", message.RoomID, "client_id", c.ID)
 		case TypeLeave:
 			// ensure client leaves the correct room
 			message.RoomID = c.RoomID

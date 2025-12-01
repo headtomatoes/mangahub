@@ -171,6 +171,13 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
+	// Create websocket hub and run it in a separate goroutine
+	wsHub := ws.NewHub()
+	go wsHub.Run()
+
+	// Register WebSocket route
+	r.GET("/ws", mid.AuthMiddleware(authSvc), ws.WSHandler(wsHub))
+
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.HTTPPort)
 
 	srv := &http.Server{
@@ -195,12 +202,6 @@ func main() {
 			}
 		}
 	}()
-
-	// create websocket hub and run it in a separate goroutine
-	wsHub := ws.NewHub()
-	go wsHub.Run()
-
-	r.GET("/ws", mid.AuthMiddleware(authSvc), ws.WSHandler(wsHub))
 	// Wait for shutdown signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

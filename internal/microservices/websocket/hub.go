@@ -121,7 +121,7 @@ func (h *Hub) HandleJoinRoom(action *RoomActions) {
 		h.Rooms[action.RoomID] = room
 		slog.Info("Room auto-created", "room_id", action.RoomID)
 	}
-	
+
 	// because client 1:1 room => remove client from previous room if any
 	if action.Client.RoomID != NilRoomID && action.Client.RoomID != action.RoomID {
 		// check if previous room exists
@@ -132,16 +132,25 @@ func (h *Hub) HandleJoinRoom(action *RoomActions) {
 
 	// add client to the room
 	room.AddUser(action.Client)
+
 	// notify the client that they have joined the room
+	// Use the updated room ID from the client (AddUser updates it)
+	userCount := room.GetUserCount()
 	joinMsg := NewSystemMessage(
-		action.RoomID,
-		fmt.Sprintf("You have joined the chat room for manga ID %d. Users online: %d", action.RoomID, room.GetUserCount()))
+		action.Client.RoomID,
+		fmt.Sprintf("You have joined the chat room for manga ID %d. Users online: %d", action.Client.RoomID, userCount))
 	action.Client.SendMessage(joinMsg)
-	// notify others in the room that user has joined
+
+	// notify others in the room that user has joined (exclude the joining user)
 	sysMsg := NewSystemMessage(
-		action.RoomID,
+		action.Client.RoomID,
 		fmt.Sprintf("[%s] has joined the chat.", action.Client.UserName))
-	room.Broadcast(sysMsg)
+	// Broadcast to all except the sender (they already got their join message)
+	for _, client := range room.GetClients() {
+		if client.ID != action.Client.ID {
+			client.SendMessage(sysMsg)
+		}
+	}
 }
 
 // HandleLeaveRoom: handles client leaving a room

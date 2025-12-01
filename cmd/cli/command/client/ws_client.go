@@ -92,34 +92,51 @@ func JoinChatRoom(roomID, token string) error {
 		}
 	}()
 
-	// Wait for interrupt
-	<-interrupt
-	log.Println("Closing connection...")
+	// Wait for interrupt or done
+	select {
+	case <-interrupt:
+		log.Println("\nClosing connection...")
+	case <-done:
+		log.Println("\nConnection closed by server")
+	}
 
-	// Send leave message
+	// Send leave message (best effort)
 	leaveMsg := map[string]any{
 		"type":    "leave",
 		"room_id": roomIDInt,
 	}
-	conn.WriteJSON(leaveMsg)
+	if err := conn.WriteJSON(leaveMsg); err != nil {
+		log.Printf("Warning: failed to send leave message: %v\n", err)
+	}
+
+	// Graceful close
+	if err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
+		log.Printf("Warning: failed to send close message: %v\n", err)
+	}
 
 	return nil
 }
 
 func PrintMessage(msg map[string]any) {
-	msgType := msg["type"].(string)
+	msgType, ok := msg["type"].(string)
+	if !ok {
+		return
+	}
 
 	switch msgType {
 	case "system":
-		color.Yellow("🔔 %s", msg["content"])
+		if content, ok := msg["content"].(string); ok {
+			color.Yellow("🔔 %s", content)
+		}
 
 	case "chat":
-		username := msg["username"].(string)
-		content := msg["content"].(string)
+		username, _ := msg["user_name"].(string)
+		content, _ := msg["content"].(string)
 		color.Cyan("[%s] %s", username, content)
 
 	case "typing":
-		username := msg["username"].(string)
-		color.HiBlack("%s is typing...", username)
+		if username, ok := msg["user_name"].(string); ok {
+			color.HiBlack("%s is typing...", username)
+		}
 	}
 }
