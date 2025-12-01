@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"log/slog"
 	"sync"
 )
@@ -76,18 +77,133 @@ func (h *Hub) RegisterClient(c *Client) {
 }
 
 // UnregisterClient: unregisters a client
-func (h *Hub) UnregisterClient(c *Client) {}
+func (h *Hub) UnregisterClient(c *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if _, exists := h.Clients[c.ID]; exists {
+		// remove client from any room they are in
+		// check if client is in a room or not
+		if c.RoomID != NilRoomID {
+			// check if room exists before removing user from it
+			if room, roomExists := h.Rooms[c.RoomID]; roomExists {
+				room.RemoveUser(c)
+
+				// notify others in the room that user has left
+				sysMsg := NewSystemMessage(
+					c.RoomID,
+					fmt.Sprintf("[%s] has left the chat.", c.UserName))
+				room.Broadcast(sysMsg)
+			}
+			// remove client from hub's client map
+			delete(h.Clients, c.ID)
+			// close client's send channel to free resources
+			close(c.SendChannel)
+			slog.Info("Client unregistered", "client_id", c.ID)
+		} else {
+			slog.Warn("Client not in any room during unregistration", "client_id", c.ID)
+		}
+	} else {
+		slog.Warn("Client not found during unregistration", "client_id", c.ID)
+	}
+}
 
 // HandleJoinRoom: handles client joining a room
-func (h *Hub) HandleJoinRoom(action *RoomActions) {}
+func (h *Hub) HandleJoinRoom(action *RoomActions) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// check if room exists, if not return the message that this manga room does not exist
+	// => manga must be created first before chat room can be created
+	room, exists := h.Rooms[action.RoomID]
+	if !exists {
+		slog.Warn("Room not found for joining", "room_id", action.RoomID)
+		sysMsg := NewSystemMessage(
+			action.RoomID,
+			"Room does not exist. Please send the request to create the manga first before joining the chat room.")
+		action.Client.SendMessage(sysMsg)
+		return
+	}
+	// because client 1:1 room => remove client from previous room if any
+	if action.Client.RoomID != NilRoomID && action.Client.RoomID != action.RoomID {
+		// check if previous room exists
+		if prevRoom, prevExists := h.Rooms[action.Client.RoomID]; prevExists {
+			prevRoom.RemoveUser(action.Client)
+		}
+	}
+
+	// add client to the room
+	room.AddUser(action.Client)
+	// notify the client that they have joined the room
+	joinMsg := NewSystemMessage(
+		action.RoomID,
+		fmt.Sprintf("You have joined the chat room for manga ID %d.", action.RoomID))
+	action.Client.SendMessage(joinMsg)
+	// notify others in the room that user has joined
+	sysMsg := NewSystemMessage(
+		action.RoomID,
+		fmt.Sprintf("[%s] has joined the chat.", action.Client.UserName))
+	room.Broadcast(sysMsg)
+}
 
 // HandleLeaveRoom: handles client leaving a room
-func (h *Hub) HandleLeaveRoom(action *RoomActions) {}
+func (h *Hub) HandleLeaveRoom(action *RoomActions) {
+	h.mu.Lock()
+	// get the room
+	room, exists := h.Rooms[action.RoomID]
+	h.mu.Unlock()
+	if !exists {
+		slog.Warn("Room not found for leaving", "room_id", action.RoomID)
+		sysMsg := NewSystemMessage(
+			action.RoomID,
+			"Room does not exist.")
+		action.Client.SendMessage(sysMsg)
+		return
+	}
+	// remove client from the room
+	room.RemoveUser(action.Client)
+	// notify the client that they have left the room
+	leaveMsg := NewSystemMessage(
+		action.RoomID,
+		fmt.Sprintf("You have left the chat room for manga ID %d.", action.RoomID))
+	action.Client.SendMessage(leaveMsg)
+	// notify others in the room that user has left
+	sysMsg := NewSystemMessage(
+		action.RoomID,
+		fmt.Sprintf("[%s] has left the chat.", action.Client.UserName))
+	room.Broadcast(sysMsg)
+}
 
 // BroadcastMessage: broadcasts a message to the appropriate room
-func (h *Hub) BroadcastMessage(message *Message) {}
+func (h *Hub) BroadcastMessage(message *Message) {
+	h.mu.RLock()
+	// check if room that message is sent to exists
+	room, exists := h.Rooms[message.RoomID]
+	h.mu.RUnlock()
+	if !exists {
+		slog.Warn("Room not found for broadcasting message", "room_id", message.RoomID)
+	}
+	// log the broadcast action
+	slog.Info("Broadcasting message",
+		slog.Int64("room_id", message.RoomID),
+		slog.String("user_id", message.UserID),
+		slog.String("user_name", message.UserName),
+		slog.String("message", message.Content))
 
-// GetRoom: retrieves or creates a room by ID
-func (h *Hub) GetRoom(roomID int64) *Room {
-	return nil
+	// broadcast to room
+	room.Broadcast(message)
+}
+
+// GetRoom: retrieves a room by ID
+func (h *Hub) GetRoom(roomID int64) (*Room, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	// check if room exists
+	room, exists := h.Rooms[roomID]
+	if exists {
+		return room, nil
+	}
+	// if not return error and nil
+	return nil, fmt.Errorf("room with ID %d not found", roomID)
 }

@@ -13,6 +13,10 @@ type Room struct {
 	mu      sync.RWMutex       // mutex for concurrent access
 }
 
+const (
+	NilRoomID int64 = -1 // indicates no room
+)
+
 // NewRoom creates a new chat Room
 func NewRoom(id int64, title string) *Room {
 	return &Room{
@@ -29,7 +33,8 @@ func (r *Room) AddUser(c *Client) {
 	// check if client already exists
 	if r.Clients[c.ID] == nil {
 		slog.Info("Client added to room", "room_id", r.ID, "client_id", c.ID)
-		r.Clients[c.ID] = c
+		r.Clients[c.ID] = c // add client to room's client map
+		c.RoomID = r.ID     // set client's room ID
 	} else {
 		slog.Warn("Client already in room", "room_id", r.ID, "client_id", c.ID)
 	}
@@ -43,13 +48,21 @@ func (r *Room) RemoveUser(c *Client) {
 	if r.Clients[c.ID] != nil {
 		slog.Info("Client removed from room", "room_id", r.ID, "client_id", c.ID)
 		delete(r.Clients, c.ID)
+		c.RoomID = NilRoomID // reset client's room ID to NilRoomID
 	} else {
 		slog.Warn("Client not found in room", "room_id", r.ID, "client_id", c.ID)
 	}
 }
 
 // Broadcast: broadcasts message to all clients in the room
-func (r *Room) Broadcast(message []byte) {}
+func (r *Room) Broadcast(message *Message) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	// iterate over all clients and send message
+	for _, client := range r.Clients {
+		client.SendMessage(message)
+	}
+}
 
 // GetUserCount: returns the number of clients in the room
 func (r *Room) GetUserCount() int {
