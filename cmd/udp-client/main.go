@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 )
- 
+
 // loginRequest matches the server DTO for login
 type loginRequest struct {
 	Username string `json:"username"`
@@ -44,16 +44,12 @@ func main() {
 	username, _ := reader.ReadString('\n')
 	username = trimNewline(username)
 
-	fmt.Print("email: ")
-	email, _ := reader.ReadString('\n')
-	email = trimNewline(email)
-
 	fmt.Print("password: ")
 	password, _ := reader.ReadString('\n')
 	password = trimNewline(password)
 
-	// Send login request to API server
-	loginReq := loginRequest{Username: username, Email: email, Password: password}
+	// Send login request to API server (email can be empty for login)
+	loginReq := loginRequest{Username: username, Password: password}
 	body, _ := json.Marshal(loginReq)
 
 	resp, err := http.Post("http://localhost:8084/auth/login", "application/json", bytes.NewReader(body))
