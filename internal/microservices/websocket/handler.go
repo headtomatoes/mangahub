@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"mangahub/internal/microservices/http-api/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,13 +23,20 @@ var upgrader = websocket.Upgrader{
 func WSHandler(hub *Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// get user info from JWT middleware
-		userID, exists := c.Get("user_id")
+		userID, exists := c.Get("userID")
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: user ID not found"})
 			return
 		}
 
-		userName, _ := c.Get("user_name")
+		// Get username from claims
+		claims, claimsExists := c.Get("claims")
+		userName := "Unknown"
+		if claimsExists {
+			if claimsData, ok := claims.(*service.Claims); ok {
+				userName = claimsData.Username
+			}
+		}
 
 		// upgrade HTTP connection to WebSocket
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -39,12 +47,12 @@ func WSHandler(hub *Hub) gin.HandlerFunc {
 
 		// create new client
 		client := NewClient(
-			userID.(string),   // unique client ID (we use userID for now)
-			userID.(string),   // user ID from JWT
-			userName.(string), // user name from JWT
-			NilRoomID,         // initially not in any room
-			conn,              // WebSocket connection
-			hub,               // reference to the central Hub
+			userID.(string), // unique client ID (we use userID for now)
+			userID.(string), // user ID from JWT
+			userName,        // user name from JWT
+			NilRoomID,       // initially not in any room
+			conn,            // WebSocket connection
+			hub,             // reference to the central Hub
 		)
 
 		// register client to hub

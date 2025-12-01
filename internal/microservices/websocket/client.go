@@ -90,8 +90,8 @@ func (c *Client) ReadPump() {
 		// with diff type of message handle accordingly
 		switch message.Type {
 		case TypeJoin:
-			// ensure client joins the correct room
-			message.RoomID = c.RoomID
+			// Update client's room ID from the message
+			c.RoomID = message.RoomID
 			c.Hub.JoinRoom <- &RoomActions{ // send join room action to hub
 				RoomID: message.RoomID,
 				Client: c,

@@ -113,17 +113,15 @@ func (h *Hub) HandleJoinRoom(action *RoomActions) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// check if room exists, if not return the message that this manga room does not exist
-	// => manga must be created first before chat room can be created
+	// check if room exists, if not create it
 	room, exists := h.Rooms[action.RoomID]
 	if !exists {
-		slog.Warn("Room not found for joining", "room_id", action.RoomID)
-		sysMsg := NewSystemMessage(
-			action.RoomID,
-			"Room does not exist. Please send the request to create the manga first before joining the chat room.")
-		action.Client.SendMessage(sysMsg)
-		return
+		// Auto-create room for the manga
+		room = NewRoom(action.RoomID, fmt.Sprintf("Manga %d Chat", action.RoomID))
+		h.Rooms[action.RoomID] = room
+		slog.Info("Room auto-created", "room_id", action.RoomID)
 	}
+	
 	// because client 1:1 room => remove client from previous room if any
 	if action.Client.RoomID != NilRoomID && action.Client.RoomID != action.RoomID {
 		// check if previous room exists
@@ -137,7 +135,7 @@ func (h *Hub) HandleJoinRoom(action *RoomActions) {
 	// notify the client that they have joined the room
 	joinMsg := NewSystemMessage(
 		action.RoomID,
-		fmt.Sprintf("You have joined the chat room for manga ID %d.", action.RoomID))
+		fmt.Sprintf("You have joined the chat room for manga ID %d. Users online: %d", action.RoomID, room.GetUserCount()))
 	action.Client.SendMessage(joinMsg)
 	// notify others in the room that user has joined
 	sysMsg := NewSystemMessage(
