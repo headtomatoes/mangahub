@@ -65,6 +65,27 @@ func (n *Notifier) NotifyNewChapter(mangaID int64, title string, chapter int) {
 	}()
 }
 
+// NotifyNewChapterWithPrevious sends notification with previous chapter info for comparison
+func (n *Notifier) NotifyNewChapterWithPrevious(mangaID int64, title string, oldChapter, newChapter int) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		payload := map[string]interface{}{
+			"manga_id":    mangaID,
+			"title":       title,
+			"chapter":     newChapter,
+			"old_chapter": oldChapter,
+		}
+
+		if err := n.sendNotification(ctx, "/notify/new-chapter", payload); err != nil {
+			log.Printf("[Notifier] Failed to send chapter notification for '%s' ch.%d: %v", title, newChapter, err)
+		} else {
+			log.Printf("[Notifier] ✅ Sent new chapter notification: %s - Chapter %d→%d (ID: %d)", title, oldChapter, newChapter, mangaID)
+		}
+	}()
+}
+
 // NotifyMangaUpdate sends notification for manga metadata update (async, non-blocking)
 func (n *Notifier) NotifyMangaUpdate(mangaID int64, title string) {
 	go func() {
@@ -74,6 +95,7 @@ func (n *Notifier) NotifyMangaUpdate(mangaID int64, title string) {
 		payload := map[string]interface{}{
 			"manga_id": mangaID,
 			"title":    title,
+			"changes":  []string{"metadata"}, // Generic update from sync
 		}
 
 		if err := n.sendNotification(ctx, "/notify/manga-update", payload); err != nil {

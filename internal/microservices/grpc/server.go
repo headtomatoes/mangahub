@@ -13,6 +13,7 @@ import (
 
 	models "mangahub/internal/microservices/http-api/models"
 	rp "mangahub/internal/microservices/http-api/repository"
+	search "mangahub/internal/search"
 )
 
 type MangaServiceServer struct { // internal servuce for manga operations internally(microservice GRPC server)
@@ -65,6 +66,8 @@ func modelToProto(m *models.Manga) *pb.Manga {
 		Genres:        genres,
 		CoverUrl:      cover,
 		ChaptersCount: chapters,
+		Source:        "local",
+		SourceUrl:     "",
 	}
 }
 
@@ -88,34 +91,84 @@ func (s *MangaServiceServer) SearchManga(ctx context.Context, req *pb.SearchRequ
 	if req == nil {
 		return nil, fmt.Errorf("empty request")
 	}
+	query := req.GetQuery()
 	limit := int(req.GetLimit())
 	offset := int(req.GetOffset())
-	if limit <= 0 {
-		limit = 20
+	if limit <= 0 || limit > 20 {
+		limit = 20 // hard cap
 	}
-	// repository exposes SearchByTitle; use it and paginate results here
-	all, err := s.mangaRepo.SearchByTitle(ctx, req.GetQuery())
+
+	// 1) Search local DB (pagination applied)
+	localAll, err := s.mangaRepo.SearchByTitle(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	total := int64(len(all))
+	totalLocal := len(localAll)
 	start := offset
-	if start > len(all) {
-		start = len(all)
+	if start > totalLocal {
+		start = totalLocal
 	}
 	end := start + limit
-	if end > len(all) {
-		end = len(all)
+	if end > totalLocal {
+		end = totalLocal
 	}
-	page := all[start:end]
+	localPage := localAll[start:end]
+
+	// Convert local to proto now
+	var localPB []*pb.Manga
+	for _, m := range localPage {
+		pm := modelToProto(&m)
+		localPB = append(localPB, pm)
+	}
+
+	// 2) Always fetch external to ensure links are included
+	externals := search.FetchExternalSources(ctx, query, limit)
+
+	// 3) Merge results with simple policy to ensure external visibility
+	// - Take up to half of the limit from local first
+	// - Fill the rest from externals
+	// - If still not full, backfill with remaining local
+	half := limit / 2
+	if half == 0 {
+		half = 1
+	}
+
+	seen := make(map[string]struct{})
+	var out []*pb.Manga
+
+	// helper to push unique items
+	push := func(items []*pb.Manga) {
+		for _, it := range items {
+			if len(out) >= limit {
+				return
+			}
+			key := fmt.Sprintf("%s|%s|%d", it.GetSource(), it.GetTitle(), it.GetId())
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, it)
+		}
+	}
+
+	// Take up to half from local
+	if len(localPB) > half {
+		push(localPB[:half])
+	} else {
+		push(localPB)
+	}
+	// Fill with externals
+	push(externals)
+	// Backfill with remaining local
+	if len(out) < limit {
+		if len(localPB) > half {
+			push(localPB[half:])
+		}
+	}
 
 	resp := &pb.SearchResponse{
-		TotalCount: total,
-	}
-	for _, m := range page {
-		// each m is models.Manga (not pointer) from SearchByTitle — take address
-		pm := modelToProto(&m)
-		resp.Mangas = append(resp.Mangas, pm)
+		Mangas:     out,
+		TotalCount: int64(len(out)),
 	}
 	return resp, nil
 }

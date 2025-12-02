@@ -12,7 +12,7 @@ import (
 	"mangahub/internal/microservices/http-api/repository"
 	udp "mangahub/internal/microservices/udp-server"
 )
- 
+
 func main() {
 	// Load environment variables
 	port := os.Getenv("UDP_PORT")
@@ -77,9 +77,10 @@ func main() {
 				return
 			}
 			var payload struct {
-				MangaID int64  `json:"manga_id"`
-				Title   string `json:"title"`
-				Chapter int    `json:"chapter"`
+				MangaID    int64  `json:"manga_id"`
+				Title      string `json:"title"`
+				Chapter    int    `json:"chapter"`
+				OldChapter *int   `json:"old_chapter,omitempty"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -87,9 +88,18 @@ func main() {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			if err := server.NotifyNewChapter(ctx, payload.MangaID, payload.Title, payload.Chapter); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+
+			// Use the enhanced method if old chapter is provided
+			if payload.OldChapter != nil {
+				if err := server.NotifyNewChapterWithPrevious(ctx, payload.MangaID, payload.Title, *payload.OldChapter, payload.Chapter); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else {
+				if err := server.NotifyNewChapter(ctx, payload.MangaID, payload.Title, payload.Chapter); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 			w.WriteHeader(http.StatusAccepted)
 		})
@@ -101,27 +111,45 @@ func main() {
 				return
 			}
 			var payload struct {
-				MangaID int64  `json:"manga_id"`
-				Title   string `json:"title"`
-				Message string `json:"message"`
+				MangaID         int64         `json:"manga_id"`
+				Title           string        `json:"title"`
+				Changes         []string      `json:"changes"`
+				DetailedChanges []interface{} `json:"detailed_changes,omitempty"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			// build a MANGA_UPDATE notification and broadcast to library users (stores unread)
-			notif := &udp.Notification{
-				Type:      udp.NotificationMangaUpdate,
-				MangaID:   payload.MangaID,
-				Title:     payload.Title,
-				Message:   payload.Message,
-				Timestamp: time.Now(),
-			}
+
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			if err := server.GetBroadcaster().BroadcastToLibraryUsers(ctx, payload.MangaID, notif); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+
+			// Use detailed notification if available
+			if len(payload.DetailedChanges) > 0 {
+				// Convert to []udp.FieldChange
+				fieldChanges := make([]udp.FieldChange, 0, len(payload.DetailedChanges))
+				for _, dc := range payload.DetailedChanges {
+					if dcMap, ok := dc.(map[string]interface{}); ok {
+						fc := udp.FieldChange{
+							Field:    dcMap["field"].(string),
+							NewValue: dcMap["new_value"],
+						}
+						if oldVal, ok := dcMap["old_value"]; ok {
+							fc.OldValue = oldVal
+						}
+						fieldChanges = append(fieldChanges, fc)
+					}
+				}
+				if err := server.NotifyMangaUpdateWithDetails(ctx, payload.MangaID, payload.Title, fieldChanges); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else {
+				// Fallback to basic notification
+				if err := server.NotifyMangaUpdate(ctx, payload.MangaID, payload.Title, payload.Changes); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 			w.WriteHeader(http.StatusAccepted)
 		})

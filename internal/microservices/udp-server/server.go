@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 )
- 
+
 // Server represents the UDP notification server
 type Server struct {
 	conn             *net.UDPConn
@@ -198,6 +198,33 @@ func (s *Server) NotifyNewManga(mangaID int64, title string) error {
 // NotifyNewChapter broadcasts notification for new chapter to library users
 func (s *Server) NotifyNewChapter(ctx context.Context, mangaID int64, title string, chapter int) error {
 	notification := NewChapterNotification(mangaID, title, chapter)
+	return s.broadcaster.BroadcastToLibraryUsers(ctx, mangaID, notification)
+}
+
+// NotifyNewChapterWithPrevious broadcasts notification for new chapter with previous chapter info
+func (s *Server) NotifyNewChapterWithPrevious(ctx context.Context, mangaID int64, title string, oldChapter, newChapter int) error {
+	notification := NewChapterNotification(mangaID, title, newChapter)
+	// Update the Changes field to include the old chapter
+	notification.Changes = []FieldChange{
+		{
+			Field:    "current_chapter",
+			OldValue: oldChapter,
+			NewValue: newChapter,
+		},
+	}
+	notification.Message = fmt.Sprintf("New chapter %d available (was chapter %d)", newChapter, oldChapter)
+	return s.broadcaster.BroadcastToLibraryUsers(ctx, mangaID, notification)
+}
+
+// NotifyMangaUpdate broadcasts notification for manga update to library users
+func (s *Server) NotifyMangaUpdate(ctx context.Context, mangaID int64, title string, changes []string) error {
+	notification := NewMangaUpdateNotification(mangaID, title, changes)
+	return s.broadcaster.BroadcastToLibraryUsers(ctx, mangaID, notification)
+}
+
+// NotifyMangaUpdateWithDetails broadcasts notification with detailed field changes
+func (s *Server) NotifyMangaUpdateWithDetails(ctx context.Context, mangaID int64, title string, fieldChanges []FieldChange) error {
+	notification := NewMangaUpdateNotificationWithDetails(mangaID, title, fieldChanges)
 	return s.broadcaster.BroadcastToLibraryUsers(ctx, mangaID, notification)
 }
 

@@ -328,8 +328,8 @@ func (s *SyncService) checkMangaChapters(ctx context.Context, manga *Manga, upda
 			continue
 		}
 
-		// Send notification (async)
-		s.notifier.NotifyNewChapter(manga.ID, manga.Title, int(extracted.ChapterNumber))
+		// Send notification with old and new chapter info (async)
+		s.notifier.NotifyNewChapterWithPrevious(manga.ID, manga.Title, baseline, int(extracted.ChapterNumber))
 	}
 
 	// Update manga's total_chapters to highest found
