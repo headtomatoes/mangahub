@@ -145,3 +145,28 @@ go build -o mangahub ./cmd/cli
 ./mangahub udp test
 ./mangahub udp listen
 
+grpc
+# Basic search
+./mangahub grpc manga search --query "naruto"
+
+# Search with pagination
+./mangahub grpc manga search --query "one piece" --limit 10 --offset 0
+
+# Use custom gRPC server address
+./mangahub grpc manga search --query "bleach" --grpc-addr "localhost:8083"
+
+# Get manga by ID
+./mangahub grpc manga get --id 123
+
+# With custom server address
+./mangahub grpc manga get --id 456 --grpc-addr "localhost:8083"
+
+# Update progress (requires login)
+./mangahub grpc progress update --manga-id 123 --chapter 45
+
+# Update with status
+./mangahub grpc progress update --manga-id 123 --chapter 45 --status "reading"
+
+# Update with manga title
+./mangahub grpc progress update --manga-id 123 --chapter 45 --title "Naruto" --status "completed"
+./mangahub grpc manga search --query "conan" --limit 20

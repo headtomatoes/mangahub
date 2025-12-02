@@ -14,6 +14,10 @@ message Manga { // move manga between each service
     repeated string genres = 5;
     string cover_url = 6;
     int32 chapters_count = 7;
+    // external source identifier (e.g., "local", "anilist", "kitsu", "mangadex")
+    string source = 8;
+    // direct URL to the manga resource on the source site
+    string source_url = 9;
 }
 
 // SearchRequest for searching manga

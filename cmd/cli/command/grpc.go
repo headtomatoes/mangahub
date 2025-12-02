@@ -123,7 +123,10 @@ var grpcMangaSearchCmd = &cobra.Command{
 			fmt.Println("No manga found matching your search.")
 		} else {
 			for i, manga := range mangas {
-				fmt.Printf("%d. [ID: %d] %s\n", i+1, manga.Id, manga.Title)
+				fmt.Printf("%d. %s\n", i+1, manga.Title)
+				if manga.Id != 0 {
+					fmt.Printf("   Local ID: %d\n", manga.Id)
+				}
 				if manga.Description != "" && len(manga.Description) > 100 {
 					fmt.Printf("   %s...\n", manga.Description[:100])
 				} else if manga.Description != "" {
@@ -132,7 +135,16 @@ var grpcMangaSearchCmd = &cobra.Command{
 				if len(manga.Genres) > 0 {
 					fmt.Printf("   Genres: %v\n", manga.Genres)
 				}
-				fmt.Printf("   Chapters: %d\n\n", manga.ChaptersCount)
+				if manga.ChaptersCount > 0 {
+					fmt.Printf("   Chapters: %d\n", manga.ChaptersCount)
+				}
+				if manga.Source != "" {
+					fmt.Printf("   Source: %s\n", manga.Source)
+				}
+				if manga.SourceUrl != "" {
+					fmt.Printf("   URL: %s\n", manga.SourceUrl)
+				}
+				fmt.Printf("\n")
 			}
 		}
 
