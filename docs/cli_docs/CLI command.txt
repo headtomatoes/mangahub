@@ -138,3 +138,10 @@ export MANGAHUB_API_URL="http://localhost:8084"
 ./mangahub genre create "Action"
 ./mangahub manga create --title "New Manga" --author "Author" --status "ongoing"
 
+
+UDP
+go build -o mangahub ./cmd/cli
+./mangahub auth login -u 'mcfc99999>9' -p 'SecurePass123!'
+./mangahub udp test
+./mangahub udp listen
+

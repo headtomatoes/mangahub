@@ -43,6 +43,14 @@ type UDPNotification struct {
 	Message   string                 `json:"message"`
 	Timestamp time.Time              `json:"timestamp"`
 	Data      map[string]interface{} `json:"data,omitempty"`
+	Changes   []FieldChange          `json:"changes,omitempty"`
+}
+
+// FieldChange represents a specific field that was updated
+type FieldChange struct {
+	Field    string      `json:"field"`
+	OldValue interface{} `json:"old_value,omitempty"`
+	NewValue interface{} `json:"new_value"`
 }
 
 // subscribeRequest for UDP server
@@ -212,11 +220,47 @@ func (c *UDPClient) displayNotification(n *UDPNotification) {
 				fmt.Printf("  📄 Chapter: %.0f\n", chapter)
 			}
 		}
+		// Display changes if available
+		if len(n.Changes) > 0 {
+			fmt.Println("  🔄 Changes:")
+			for _, change := range n.Changes {
+				if change.OldValue != nil {
+					fmt.Printf("    • %s: %v → %v\n", change.Field, change.OldValue, change.NewValue)
+				} else {
+					fmt.Printf("    • %s: %v\n", change.Field, change.NewValue)
+				}
+			}
+		}
 		fmt.Printf("  💬 %s\n", n.Message)
 
 	case "MANGA_UPDATE":
 		fmt.Printf("  🔄 MANGA UPDATED!\n")
 		fmt.Printf("  📖 Title: %s\n", n.Title)
+		fmt.Printf("  🆔 Manga ID: %d\n", n.MangaID)
+
+		// Display detailed changes if available
+		if len(n.Changes) > 0 {
+			fmt.Println("  📝 Changes:")
+			for _, change := range n.Changes {
+				if change.OldValue != nil {
+					fmt.Printf("    • %s: %v → %v\n", change.Field, change.OldValue, change.NewValue)
+				} else {
+					fmt.Printf("    • %s: %v\n", change.Field, change.NewValue)
+				}
+			}
+		} else if n.Data != nil {
+			// Fallback to showing updated fields list
+			if updatedFields, ok := n.Data["updated_fields"].([]interface{}); ok && len(updatedFields) > 0 {
+				fmt.Printf("  📝 Updated Fields: ")
+				for i, field := range updatedFields {
+					if i > 0 {
+						fmt.Printf(", ")
+					}
+					fmt.Printf("%v", field)
+				}
+				fmt.Println()
+			}
+		}
 		fmt.Printf("  💬 %s\n", n.Message)
 
 	case "PONG":

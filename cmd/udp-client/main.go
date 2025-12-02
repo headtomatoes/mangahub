@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -109,12 +110,15 @@ func main() {
 				continue
 			}
 
-			var pretty bytes.Buffer
-			if err := json.Indent(&pretty, buf[:n], "", "  "); err != nil {
+			// Parse and display notification with enhanced formatting
+			var notification map[string]interface{}
+			if err := json.Unmarshal(buf[:n], &notification); err != nil {
 				fmt.Printf("received: %s\n", string(buf[:n]))
-			} else {
-				fmt.Printf("notification:\n%s\n", pretty.String())
+				continue
 			}
+
+			// Display notification with clear formatting
+			displayNotification(notification)
 		}
 	}()
 
@@ -146,4 +150,64 @@ func trimNewline(s string) string {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+// displayNotification formats and displays notification with enhanced details
+func displayNotification(notif map[string]interface{}) {
+	fmt.Println("\n" + strings.Repeat("=", 60))
+
+	notifType, _ := notif["type"].(string)
+	title, _ := notif["title"].(string)
+	message, _ := notif["message"].(string)
+	timestamp, _ := notif["timestamp"].(string)
+
+	// Parse timestamp for better display
+	var timeStr string
+	if t, err := time.Parse(time.RFC3339, timestamp); err == nil {
+		timeStr = t.Format("2006-01-02 15:04:05")
+	} else {
+		timeStr = timestamp
+	}
+
+	fmt.Printf("📢 %s\n", notifType)
+	fmt.Printf("📚 Title: %s\n", title)
+	fmt.Printf("💬 %s\n", message)
+	fmt.Printf("🕐 Time: %s\n", timeStr)
+
+	// Display changes if available
+	if changes, ok := notif["changes"].([]interface{}); ok && len(changes) > 0 {
+		fmt.Println("\n🔄 Changes:")
+		for _, change := range changes {
+			if changeMap, ok := change.(map[string]interface{}); ok {
+				field, _ := changeMap["field"].(string)
+				oldValue := changeMap["old_value"]
+				newValue := changeMap["new_value"]
+
+				if oldValue != nil {
+					fmt.Printf("  • %s: %v → %v\n", field, oldValue, newValue)
+				} else {
+					fmt.Printf("  • %s: %v\n", field, newValue)
+				}
+			}
+		}
+	}
+
+	// Display additional data if available
+	if data, ok := notif["data"].(map[string]interface{}); ok && len(data) > 0 {
+		if chapter, ok := data["chapter"].(float64); ok {
+			fmt.Printf("\n📖 Chapter: %.0f\n", chapter)
+		}
+		if updatedFields, ok := data["updated_fields"].([]interface{}); ok && len(updatedFields) > 0 {
+			fmt.Print("\n📝 Updated fields: ")
+			fields := make([]string, 0, len(updatedFields))
+			for _, f := range updatedFields {
+				if fieldStr, ok := f.(string); ok {
+					fields = append(fields, fieldStr)
+				}
+			}
+			fmt.Println(strings.Join(fields, ", "))
+		}
+	}
+
+	fmt.Println(strings.Repeat("=", 60))
 }
