@@ -27,6 +27,7 @@ func (h *MangaHandler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Public routes (any authenticated user)
 	rg.GET("/", middleware.RequireScopes("read:manga"), h.List)
 	rg.GET("/search", middleware.RequireScopes("read:manga"), h.SearchByTitle)
+	rg.GET("/advanced-search", middleware.RequireScopes("read:manga"), h.AdvancedSearch)
 	rg.GET("/:manga_id", middleware.RequireScopes("read:manga"), h.Get)
 
 	// Admin-only routes
@@ -67,7 +68,15 @@ func (h *MangaHandler) List(c *gin.Context) {
 		resp = append(resp, dto.FromModelToBasicResponse(m))
 	}
 
-	c.JSON(http.StatusOK, dto.NewPaginatedMangaBasicResponse(resp, page, pageSize, total))
+	c.JSON(http.StatusOK, gin.H{
+		"data": resp,
+		"pagination": gin.H{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       total,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+		},
+	})
 }
 
 func (h *MangaHandler) Get(c *gin.Context) {
@@ -107,7 +116,6 @@ func (h *MangaHandler) Create(c *gin.Context) {
 	// Assign genres if provided
 	if len(in.GenreIDs) > 0 {
 		if err := h.svc.ReplaceGenresForManga(ctx, model.ID, in.GenreIDs); err != nil {
-			// Log the error but don't fail the request since manga was created
 			c.JSON(http.StatusCreated, gin.H{
 				"manga":   dto.FromModelToResponse(model),
 				"warning": "Manga created but failed to assign some genres: " + err.Error(),
@@ -119,7 +127,6 @@ func (h *MangaHandler) Create(c *gin.Context) {
 	// Fetch the manga with genres to return complete data
 	created, err := h.svc.GetByID(ctx, model.ID)
 	if err != nil {
-		// Manga was created but we couldn't fetch it back
 		c.JSON(http.StatusCreated, dto.FromModelToResponse(model))
 		return
 	}
@@ -212,9 +219,116 @@ func (h *MangaHandler) SearchByTitle(c *gin.Context) {
 		return
 	}
 
-	resp := make([]dto.MangaResponse, 0, len(list))
+	resp := make([]dto.MangaBasicResponse, 0, len(list))
 	for _, m := range list {
-		resp = append(resp, dto.FromModelToResponse(m))
+		resp = append(resp, dto.FromModelToBasicResponse(m))
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{
+		"data":  resp,
+		"total": len(resp),
+	})
+}
+
+// AdvancedSearch handles GET /api/manga/advanced-search with multiple filter parameters
+func (h *MangaHandler) AdvancedSearch(c *gin.Context) {
+	var filters dto.SearchFilters
+
+	// Manual parsing with sanitization
+	filters.Query = strings.TrimSpace(c.Query("q"))
+	filters.Status = strings.TrimSpace(c.Query("status"))
+	filters.SortBy = strings.TrimSpace(c.Query("sort_by"))
+
+	// Parse genres (comma-separated)
+	if genresStr := strings.TrimSpace(c.Query("genres")); genresStr != "" {
+		genresList := strings.Split(genresStr, ",")
+		filters.Genres = make([]string, 0, len(genresList))
+		for _, g := range genresList {
+			if trimmed := strings.TrimSpace(g); trimmed != "" {
+				filters.Genres = append(filters.Genres, trimmed)
+			}
+		}
+	}
+
+	// Parse min_rating
+	if minRatingStr := strings.TrimSpace(c.Query("min_rating")); minRatingStr != "" {
+		if minRating, err := strconv.ParseFloat(minRatingStr, 64); err == nil && minRating >= 0 && minRating <= 10 {
+			filters.MinRating = &minRating
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid min_rating parameter, must be between 0 and 10"})
+			return
+		}
+	}
+
+	// Parse page
+	filters.Page = 1
+	if pageStr := strings.TrimSpace(c.Query("page")); pageStr != "" {
+		if page, err := strconv.Atoi(pageStr); err == nil && page >= 1 {
+			filters.Page = page
+		}
+	}
+
+	// Parse page_size
+	filters.PageSize = 20
+	if pageSizeStr := strings.TrimSpace(c.Query("page_size")); pageSizeStr != "" {
+		if pageSize, err := strconv.Atoi(pageSizeStr); err == nil && pageSize >= 1 && pageSize <= 100 {
+			filters.PageSize = pageSize
+		}
+	}
+
+	// Validate status
+	if filters.Status != "" {
+		validStatuses := map[string]bool{"ongoing": true, "completed": true, "hiatus": true}
+		if !validStatuses[strings.ToLower(filters.Status)] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status, must be one of: ongoing, completed, hiatus"})
+			return
+		}
+	}
+
+	// Validate sort_by
+	if filters.SortBy != "" {
+		validSortBy := map[string]bool{"popularity": true, "rating": true, "recent": true, "title": true}
+		if !validSortBy[strings.ToLower(filters.SortBy)] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sort_by, must be one of: popularity, rating, recent, title"})
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	list, total, err := h.svc.AdvancedSearch(ctx, filters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Use MangaBasicResponse for list results
+	resp := make([]dto.MangaBasicResponse, 0, len(list))
+	for _, m := range list {
+		resp = append(resp, dto.FromModelToBasicResponse(m))
+	}
+
+	totalPages := int64(0)
+	if filters.PageSize > 0 {
+		totalPages = (total + int64(filters.PageSize) - 1) / int64(filters.PageSize)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": resp,
+		"pagination": gin.H{
+			"page":         filters.Page,
+			"page_size":    filters.PageSize,
+			"total":        total,
+			"total_pages":  totalPages,
+			"has_next":     filters.Page < int(totalPages),
+			"has_previous": filters.Page > 1,
+		},
+		"filters": gin.H{
+			"query":      filters.Query,
+			"genres":     filters.Genres,
+			"status":     filters.Status,
+			"min_rating": filters.MinRating,
+			"sort_by":    filters.SortBy,
+		},
+	})
 }

@@ -11,10 +11,9 @@ import (
 	"regexp"
 	"strings"
 
-	// "time"
-
 	"github.com/google/uuid"
 
+	"mangahub/internal/microservices/http-api/dto"
 	"mangahub/internal/microservices/http-api/models"
 	"mangahub/internal/microservices/http-api/repository"
 )
@@ -26,10 +25,9 @@ type MangaService interface {
 	Update(ctx context.Context, id int64, m *models.Manga) error
 	Delete(ctx context.Context, id int64) error
 
-	// new search method
 	SearchByTitle(ctx context.Context, title string) ([]models.Manga, error)
+	AdvancedSearch(ctx context.Context, filters dto.SearchFilters) ([]models.Manga, int64, error)
 
-	// manga <-> genres (for handler endpoints)
 	ReplaceGenresForManga(ctx context.Context, mangaID int64, genreIDs []int64) error
 }
 
@@ -75,6 +73,11 @@ func (s *mangaService) Create(ctx context.Context, m *models.Manga) error {
 		a := strings.TrimSpace(*m.Author)
 		m.Author = &a
 	}
+
+	// // Validate year if provided
+	// if m.PublishedYear != nil && (*m.PublishedYear < 1900 || *m.PublishedYear > 2100) {
+	// 	return errors.New("invalid publication year")
+	// }
 
 	if err := s.repo.Create(ctx, m); err != nil {
 		return err
@@ -205,6 +208,25 @@ func (s *mangaService) Update(ctx context.Context, id int64, m *models.Manga) er
 			changes = append(changes, "cover image")
 		}
 	}
+	// if m.PublishedYear != nil {
+	// 	if existing.PublishedYear == nil || *m.PublishedYear != *existing.PublishedYear {
+	// 		// Validate year
+	// 		if *m.PublishedYear < 1900 || *m.PublishedYear > 2100 {
+	// 			return errors.New("invalid publication year")
+	// 		}
+	// 		oldVal := 0
+	// 		if existing.PublishedYear != nil {
+	// 			oldVal = *existing.PublishedYear
+	// 		}
+	// 		detailedChanges = append(detailedChanges, fieldChange{
+	// 			Field:    "published_year",
+	// 			OldValue: oldVal,
+	// 			NewValue: *m.PublishedYear,
+	// 		})
+	// 		existing.PublishedYear = m.PublishedYear
+	// 		changes = append(changes, "published year")
+	// 	}
+	// }
 
 	// update updated_at business rule could be here
 
@@ -236,25 +258,9 @@ func notifyNewManga(mangaID int64, title string) {
 	_, _ = http.Post(url, "application/json", bytes.NewReader(b))
 }
 
-func notifyMangaUpdate(mangaID int64, title string, changes []string) {
-	url := os.Getenv("UDP_TRIGGER_URL")
-	if url == "" {
-		// call the dedicated manga-update trigger in the UDP server
-		url = "http://udp-server:8085/notify/manga-update"
-	}
-	payload := map[string]interface{}{
-		"manga_id": mangaID,
-		"title":    title,
-		"changes":  changes,
-	}
-	b, _ := json.Marshal(payload)
-	_, _ = http.Post(url, "application/json", bytes.NewReader(b))
-}
-
 func notifyMangaUpdateDetailed(mangaID int64, title string, changes []string, detailedChanges []interface{}) {
 	url := os.Getenv("UDP_TRIGGER_URL")
 	if url == "" {
-		// call the dedicated manga-update trigger in the UDP server
 		url = "http://udp-server:8085/notify/manga-update"
 	}
 	payload := map[string]interface{}{
@@ -275,6 +281,29 @@ func (s *mangaService) Delete(ctx context.Context, id int64) error {
 // SearchByTitle returns mangas that match title (case-insensitive, partial)
 func (s *mangaService) SearchByTitle(ctx context.Context, title string) ([]models.Manga, error) {
 	return s.repo.SearchByTitle(ctx, title)
+}
+
+// AdvancedSearch performs full-text search with multiple filters
+func (s *mangaService) AdvancedSearch(ctx context.Context, filters dto.SearchFilters) ([]models.Manga, int64, error) {
+	// Validate and set defaults
+	if filters.Page < 1 {
+		filters.Page = 1
+	}
+	if filters.PageSize < 1 || filters.PageSize > 100 {
+		filters.PageSize = 20
+	}
+
+	// Validate rating range
+	if filters.MinRating != nil && (*filters.MinRating < 0 || *filters.MinRating > 10) {
+		return nil, 0, errors.New("min_rating must be between 0 and 10")
+	}
+
+	// // Validate year range
+	// if filters.YearFrom != nil && filters.YearTo != nil && *filters.YearFrom > *filters.YearTo {
+	// 	return nil, 0, errors.New("year_from cannot be greater than year_to")
+	// }
+
+	return s.repo.AdvancedSearch(ctx, filters)
 }
 
 func (s *mangaService) ReplaceGenresForManga(ctx context.Context, mangaID int64, genreIDs []int64) error {

@@ -70,7 +70,6 @@ func (s *ratingService) CreateOrUpdateRating(userID string, mangaID int64, ratin
 		if err := s.ratingRepo.Create(newRating); err != nil {
 			return nil, err
 		}
-		rating = newRating
 		// Reload with user data
 		rating, err = s.ratingRepo.GetByUserAndManga(userID, mangaID)
 		if err != nil {
