@@ -19,11 +19,11 @@ import (
 	// gormdb "mangahub/internal/db" // removed — use database.OpenGorm()
 	"mangahub/internal/config"
 	h "mangahub/internal/microservices/http-api/handler"
-
 	mid "mangahub/internal/microservices/http-api/middleware"
 	"mangahub/internal/microservices/http-api/models"
 	repo "mangahub/internal/microservices/http-api/repository"
 	svc "mangahub/internal/microservices/http-api/service"
+	ws "mangahub/internal/microservices/websocket"
 )
 
 func main() {
@@ -171,6 +171,13 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
+	// Create websocket hub and run it in a separate goroutine
+	wsHub := ws.NewHub()
+	go wsHub.Run()
+
+	// Register WebSocket route
+	r.GET("/ws", mid.AuthMiddleware(authSvc), ws.WSHandler(wsHub))
+
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.HTTPPort)
 
 	srv := &http.Server{
@@ -195,7 +202,6 @@ func main() {
 			}
 		}
 	}()
-
 	// Wait for shutdown signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
