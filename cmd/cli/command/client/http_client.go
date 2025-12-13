@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"mangahub/cmd/cli/dto"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -321,30 +322,63 @@ func (c *HTTPClient) GetMangaByID(id int64) (*MangaResponse, error) {
 	}
 	return &result, nil
 }
-
 func (c *HTTPClient) SearchManga(query string) ([]MangaResponse, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/search?q=%s", c.baseURL, query), nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+    // URL-encode the query parameter
+    params := url.Values{}
+    params.Add("q", query)
+    
+    fullURL := fmt.Sprintf("%s/api/manga/search?%s", c.baseURL, params.Encode())
+    
+    req, err := http.NewRequest("GET", fullURL, nil)
+    if err != nil {
+        return nil, err
+    }
+    req.Header.Set("Authorization", "Bearer "+c.token)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("search failed: %s", resp.Status)
-	}
+    if resp.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("search failed: %s", resp.Status)
+    }
 
-	var result []MangaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-	return result, nil
+    // The server returns: { "data": [...], "total": ... }
+    var result struct {
+        Data  []MangaResponse `json:"data"`
+        Total int             `json:"total"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, err
+    }
+    return result.Data, nil
 }
+
+// func (c *HTTPClient) SearchManga(query string) ([]MangaResponse, error) {
+// 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/search?q=%s", c.baseURL, query), nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	req.Header.Set("Authorization", "Bearer "+c.token)
+
+// 	resp, err := c.httpClient.Do(req)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer resp.Body.Close()
+
+// 	if resp.StatusCode != http.StatusOK {
+// 		return nil, fmt.Errorf("search failed: %s", resp.Status)
+// 	}
+
+// 	var result []MangaResponse
+// 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+// 		return nil, err
+// 	}
+// 	return result, nil
+// }
 
 func (c *HTTPClient) CreateManga(request *CreateMangaRequest) (*MangaResponse, error) {
 	jsonData, err := json.Marshal(request)

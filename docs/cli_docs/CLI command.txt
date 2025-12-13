@@ -159,7 +159,7 @@ grpc
 ./mangahub grpc manga get --id 123
 
 # With custom server address
-./mangahub grpc manga get --id 456 --grpc-addr "localhost:8083"
+./mangahub grpc manga get --id 46 --grpc-addr "localhost:8083"
 
 # Update progress (requires login)
 ./mangahub grpc progress update --manga-id 123 --chapter 45
