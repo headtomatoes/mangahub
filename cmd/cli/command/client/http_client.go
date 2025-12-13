@@ -82,10 +82,16 @@ type LibraryListResponse struct {
 
 type PaginatedMangaResponse struct {
 	Data       []MangaResponse `json:"data"`
-	Page       int             `json:"page"`
-	PageSize   int             `json:"page_size"`
-	Total      int64           `json:"total"`
-	TotalPages int             `json:"total_pages"`
+	Pagination struct {
+		Page       int   `json:"page"`
+		PageSize   int   `json:"page_size"`
+		Total      int64 `json:"total"`
+		TotalPages int   `json:"total_pages"`
+	} `json:"pagination"`
+	Page       int   `json:"-"` // For backward compatibility
+	PageSize   int   `json:"-"`
+	Total      int64 `json:"-"`
+	TotalPages int   `json:"-"`
 }
 
 // Rating-related request/response structures
@@ -275,30 +281,6 @@ func (c *HTTPClient) RevokeToken(request *dto.RevokeTokenRequest) (*dto.RevokeTo
 
 // add more methods as needed and link to actual API endpoints
 // Manga CURD
-func (c *HTTPClient) GetAllManga() ([]MangaResponse, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/manga", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get manga list: %s", resp.Status)
-	}
-
-	var paginatedResult PaginatedMangaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&paginatedResult); err != nil {
-		return nil, err
-	}
-	return paginatedResult.Data, nil
-}
-
 func (c *HTTPClient) GetMangaByID(id int64) (*MangaResponse, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/manga/%d", c.baseURL, id), nil)
 	if err != nil {
@@ -323,37 +305,37 @@ func (c *HTTPClient) GetMangaByID(id int64) (*MangaResponse, error) {
 	return &result, nil
 }
 func (c *HTTPClient) SearchManga(query string) ([]MangaResponse, error) {
-    // URL-encode the query parameter
-    params := url.Values{}
-    params.Add("q", query)
-    
-    fullURL := fmt.Sprintf("%s/api/manga/search?%s", c.baseURL, params.Encode())
-    
-    req, err := http.NewRequest("GET", fullURL, nil)
-    if err != nil {
-        return nil, err
-    }
-    req.Header.Set("Authorization", "Bearer "+c.token)
+	// URL-encode the query parameter
+	params := url.Values{}
+	params.Add("q", query)
 
-    resp, err := c.httpClient.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
+	fullURL := fmt.Sprintf("%s/api/manga/search?%s", c.baseURL, params.Encode())
 
-    if resp.StatusCode != http.StatusOK {
-        return nil, fmt.Errorf("search failed: %s", resp.Status)
-    }
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
 
-    // The server returns: { "data": [...], "total": ... }
-    var result struct {
-        Data  []MangaResponse `json:"data"`
-        Total int             `json:"total"`
-    }
-    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-        return nil, err
-    }
-    return result.Data, nil
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("search failed: %s", resp.Status)
+	}
+
+	// The server returns: { "data": [...], "total": ... }
+	var result struct {
+		Data  []MangaResponse `json:"data"`
+		Total int             `json:"total"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result.Data, nil
 }
 
 // func (c *HTTPClient) SearchManga(query string) ([]MangaResponse, error) {
@@ -1077,4 +1059,57 @@ func (c *HTTPClient) GetProgressHistory(mangaID *int64) (*dto.ProgressHistoryRes
 		return nil, err
 	}
 	return &result, nil
+}
+
+// GetAllMangaPaginated retrieves manga with pagination support
+func (c *HTTPClient) GetAllMangaPaginated(page, pageSize int) (*PaginatedMangaResponse, error) {
+	// Set defaults
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	url := fmt.Sprintf("%s/api/manga?page=%d&page_size=%d", c.baseURL, page, pageSize)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get manga list: %s", resp.Status)
+	}
+
+	var result PaginatedMangaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	// Copy nested pagination data to top level for easier access
+	result.Page = result.Pagination.Page
+	result.PageSize = result.Pagination.PageSize
+	result.Total = result.Pagination.Total
+	result.TotalPages = result.Pagination.TotalPages
+
+	return &result, nil
+}
+
+// GetAllManga retrieves all manga (backward compatibility, uses pagination)
+func (c *HTTPClient) GetAllManga() ([]MangaResponse, error) {
+	result, err := c.GetAllMangaPaginated(1, 100)
+	if err != nil {
+		return nil, err
+	}
+	return result.Data, nil
 }
