@@ -1,0 +1,12 @@
+-- Reset the initial sync state
+UPDATE sync_state 
+SET status = 'idle', 
+    last_success_at = NULL,
+    last_cursor = '',
+    error_message = ''
+WHERE sync_type = 'anilist_initial_sync';
+
+-- Verify the update
+SELECT * FROM sync_state WHERE sync_type = 'anilist_initial_sync';
+
+then restart the service on docker.
