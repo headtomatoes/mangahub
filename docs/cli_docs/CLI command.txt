@@ -24,8 +24,13 @@ go build -o mangahub ./cmd/cli
 
 ## Manga Commands
 
-# List all manga
+# List all manga (default: page 1, 20 items per page)
 ./mangahub manga list
+
+# List manga with pagination
+./mangahub manga list --page 1 --page-size 20
+./mangahub manga list --page 2 --page-size 10
+./mangahub manga list --page 3 --page-size 50
 
 # Get manga by ID
 ./mangahub manga get [manga-id]
@@ -37,7 +42,7 @@ go build -o mangahub ./cmd/cli
 ./mangahub manga create --title "Manga Title" --author "Author Name" --status "ongoing" --chapters 100 --description "Description" --cover-url "https://example.com/cover.jpg" --slug "manga-slug"
 
 # Update a manga (admin only)
-./mangahub manga update [manga-id] --title "New Title" --status "completed"
+./mangahub manga update 455 --title "New Title" --status "completed"
 
 # Delete a manga (admin only)
 ./mangahub manga delete [manga-id]
@@ -139,13 +144,15 @@ export MANGAHUB_API_URL="http://localhost:8084"
 ./mangahub manga create --title "New Manga" --author "Author" --status "ongoing"
 
 
-UDP
+UDP------------------------------------------------------------------------
+
 go build -o mangahub ./cmd/cli
 ./mangahub auth login -u 'mcfc99999>9' -p 'SecurePass123!'
 ./mangahub udp test
 ./mangahub udp listen
 
-grpc
+grpc------------------------------------------------------------------------
+
 # Basic search
 ./mangahub grpc manga search --query "naruto"
 
@@ -170,3 +177,24 @@ grpc
 # Update with manga title
 ./mangahub grpc progress update --manga-id 123 --chapter 45 --title "Naruto" --status "completed"
 ./mangahub grpc manga search --query "conan" --limit 20
+
+
+TCP------------------------------------------------------------------------
+
+#  Connect to TCP Sync Server
+./mangahub sync connect
+
+# Optional: specify server
+./mangahub sync connect --server <host:port>
+
+# Check TCP Sync Status
+./mangahub sync status
+
+#  Disconnect from TCP Server
+./mangahub sync disconnect
+
+# Monitor Real-time Sync Updates
+./mangahub sync monitor
+
+
+mangahub progress sync --manga-id <id> --chapter <num> --status <status>

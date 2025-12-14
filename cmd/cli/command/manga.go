@@ -17,22 +17,28 @@ var mangaCmd = &cobra.Command{
 
 var listMangaCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all manga",
+	Short: "List all manga with pagination",
+	Long:  "List manga with optional page and page_size parameters",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		page, _ := cmd.Flags().GetInt("page")
+		pageSize, _ := cmd.Flags().GetInt("page-size")
+
 		httpClient := GetAuthenticatedClient()
 
-		mangas, err := httpClient.GetAllManga()
+		result, err := httpClient.GetAllMangaPaginated(page, pageSize)
 		if err != nil {
 			return fmt.Errorf("failed to get manga list: %w", err)
 		}
 
-		if len(mangas) == 0 {
+		if len(result.Data) == 0 {
 			fmt.Println("No manga found.")
 			return nil
 		}
 
-		fmt.Printf("Found %d manga:\n\n", len(mangas))
-		for _, m := range mangas {
+		fmt.Printf("Found %d manga (Page %d/%d, Total: %d):\n\n",
+			len(result.Data), result.Page, result.TotalPages, result.Total)
+
+		for _, m := range result.Data {
 			fmt.Printf("ID: %d\n", m.ID)
 			fmt.Printf("Title: %s\n", m.Title)
 			if m.Author != nil {
@@ -44,8 +50,18 @@ var listMangaCmd = &cobra.Command{
 			if m.TotalChapters != nil {
 				fmt.Printf("Chapters: %d\n", *m.TotalChapters)
 			}
+			// if m.AverageRating != nil {
+			// 	fmt.Printf("Rating: %.2f\n", *m.AverageRating)
+			// }
 			fmt.Println(strings.Repeat("-", 50))
 		}
+
+		// Show pagination info
+		fmt.Printf("\nPage %d of %d (Total: %d manga)\n", result.Page, result.TotalPages, result.Total)
+		if result.Page < result.TotalPages {
+			fmt.Printf("Use --page %d to see next page\n", result.Page+1)
+		}
+
 		return nil
 	},
 }
@@ -363,9 +379,10 @@ func init() {
 	mangaCmd.AddCommand(createMangaCmd)
 	mangaCmd.AddCommand(updateMangaCmd)
 	mangaCmd.AddCommand(deleteMangaCmd)
-	//mangaCmd.AddCommand(genresCmd)
-	//mangaCmd.AddCommand(addGenresCmd)
-	//mangaCmd.AddCommand(removeGenresCmd)
+
+	// List command flags
+	listMangaCmd.Flags().Int("page", 1, "Page number (default: 1)")
+	listMangaCmd.Flags().Int("page-size", 20, "Number of items per page (default: 20, max: 100)")
 
 	// Create flags
 	createMangaCmd.Flags().String("title", "", "Manga title (required)")
