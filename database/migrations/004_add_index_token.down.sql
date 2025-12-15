@@ -1,2 +1,0 @@
-DROP INDEX idx_refresh_tokens_revoked;
-DROP INDEX idx_refresh_tokens_expires_at;

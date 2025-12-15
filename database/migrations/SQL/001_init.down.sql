@@ -19,6 +19,27 @@ DROP INDEX IF EXISTS idx_notifications_read;
 DROP INDEX IF EXISTS idx_notifications_created_at;
 DROP INDEX IF EXISTS idx_chapters_manga_id;
 
+-- Drop MangaDex sync indexes
+DROP INDEX IF EXISTS idx_manga_mangadex_id;
+DROP INDEX IF EXISTS idx_manga_last_synced;
+DROP INDEX IF EXISTS idx_manga_last_chapter_check;
+DROP INDEX IF EXISTS idx_chapters_mangadex_id;
+DROP INDEX IF EXISTS idx_chapters_published_at;
+
+-- Drop AniList sync indexes
+DROP INDEX IF EXISTS idx_manga_anilist_id;
+DROP INDEX IF EXISTS idx_manga_anilist_last_synced;
+DROP INDEX IF EXISTS idx_chapters_anilist_id;
+
+-- Drop triggers
+DROP TRIGGER IF EXISTS update_manga_updated_at ON manga;
+DROP TRIGGER IF EXISTS update_chapters_updated_at ON chapters;
+DROP TRIGGER IF EXISTS update_sync_state_updated_at ON sync_state;
+DROP FUNCTION IF EXISTS update_updated_at_column();
+
+-- Drop sync_state table BEFORE other tables
+DROP TABLE IF EXISTS sync_state;
+
 -- Drop all tables
 DROP TABLE IF EXISTS chapters CASCADE;
 DROP TABLE IF EXISTS ratings CASCADE;
@@ -36,3 +57,26 @@ DROP TABLE IF EXISTS notifications CASCADE;
 
 -- Drop custom types
 DROP TYPE IF EXISTS user_role;
+
+-- Rollback MangaDex sync schema extensions
+
+-- Rename published_at back to release_date
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns 
+               WHERE table_name='chapters' AND column_name='published_at') THEN
+        ALTER TABLE chapters RENAME COLUMN published_at TO release_date;
+    END IF;
+END $$;
+
+-- Remove columns from chapters
+ALTER TABLE chapters DROP COLUMN IF EXISTS mangadex_chapter_id;
+ALTER TABLE chapters DROP COLUMN IF EXISTS volume;
+ALTER TABLE chapters DROP COLUMN IF EXISTS pages;
+ALTER TABLE chapters DROP COLUMN IF EXISTS updated_at;
+
+-- Remove columns from manga
+ALTER TABLE manga DROP COLUMN IF EXISTS mangadex_id;
+ALTER TABLE manga DROP COLUMN IF EXISTS last_synced_at;
+ALTER TABLE manga DROP COLUMN IF EXISTS last_chapter_check;
+ALTER TABLE manga DROP COLUMN IF EXISTS updated_at;
