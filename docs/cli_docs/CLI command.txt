@@ -198,3 +198,19 @@ TCP------------------------------------------------------------------------
 
 
 mangahub progress sync --manga-id <id> --chapter <num> --status <status>
+
+WebSocket-----------------------------------------------------------------
+# Join a chat room using manga ID (uses stored token from login)
+mangahub chat join --room <manga-id>
+
+# Or with short flag
+mangahub chat join -r <manga-id>
+
+# Example: Join chat room for manga ID 123
+mangahub chat join --room 123
+
+# If you want to provide token manually instead of using stored credentials
+mangahub chat join --room <manga-id> --token <your-jwt-token>
+
+# Or with short flags
+mangahub chat join -r <manga-id> -t <your-jwt-token>
