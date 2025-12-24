@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # MangaHub Benchmark Runner - PowerShell Script
 # ============================================================================
 # This script runs comprehensive benchmarks against your MangaHub services
@@ -17,18 +17,18 @@ param(
     [switch]$Quick,
     [switch]$LoadTest,
     [switch]$Verbose,
-    [int]$ConcurrentUsers = 100,
-    [int]$TCPConnections = 30,
-    [int]$WSConnections = 20
+    [int]$ConcurrentUsers = 200,
+    [int]$TCPConnections = 60,
+    [int]$WSConnections = 40
 )
 
 $ErrorActionPreference = "Continue"
 
 # Configuration
-$API_URL = "http://localhost:8084"
-$TCP_HOST = "localhost"
+$API_URL = "http://10.238.20.112:8084"
+$TCP_HOST = "10.238.20.112"
 $TCP_PORT = 8081
-$WS_URL = "ws://localhost:8084/ws"
+$WS_URL = "ws://10.238.20.112:8084/ws"
 $PROMETHEUS_URL = "http://localhost:9090"
 $GRAFANA_URL = "http://localhost:3000"
 
@@ -82,9 +82,7 @@ function Test-ServiceHealth {
     
     $services = @(
         @{Name="API Server"; URL="$API_URL/check-conn"; Expected=200},
-        @{Name="Database"; URL="$API_URL/db-ping"; Expected=200},
-        @{Name="Prometheus"; URL="$PROMETHEUS_URL/-/healthy"; Expected=200},
-        @{Name="Grafana"; URL="$GRAFANA_URL/api/health"; Expected=200}
+        @{Name="Database"; URL="$API_URL/db-ping"; Expected=200}
     )
     
     $healthy = 0

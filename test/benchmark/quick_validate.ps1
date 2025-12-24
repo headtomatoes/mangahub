@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # MangaHub Quick Benchmark Validation
 # ============================================================================
 # A streamlined script to quickly validate all benchmark targets
@@ -6,7 +6,7 @@
 # ============================================================================
 
 $ErrorActionPreference = "Continue"
-$API_URL = "http://localhost:8084"
+$API_URL = "http://10.238.20.112:8084"
 $TCP_PORT = 8081
 
 # Colors
@@ -133,7 +133,7 @@ $successCount = 0
 1..25 | ForEach-Object {
     try {
         $client = New-Object System.Net.Sockets.TcpClient
-        $client.Connect("localhost", $TCP_PORT)
+        $client.Connect("10.238.20.112", $TCP_PORT)
         if($client.Connected) {
             $successCount++
             $connections += $client
@@ -155,7 +155,7 @@ Write-Host "`n──────────────────────
 Write-Host "[5] WEBSOCKET SUPPORT (Target: 10-20 users)" -ForegroundColor $Yellow
 Write-Host "────────────────────────────────────────────────────────────────────────" -ForegroundColor DarkGray
 
-Write-Host "    WebSocket endpoint: ws://localhost:8084/ws" -ForegroundColor Gray
+Write-Host "    WebSocket endpoint: ws://10.238.20.112:8084/ws" -ForegroundColor Gray
 Write-Host "    Architecture: Hub pattern with goroutine-per-connection" -ForegroundColor Gray
 Write-Host "    Status: ✅ SUPPORTED (see k6 load_test.js for live testing)" -ForegroundColor $Green
 $results["WebSocket"] = @{Pass=$true; Value="Hub pattern"; Target="10-20 users"}
