@@ -66,6 +66,7 @@ func main() {
 		&models.Notification{},
 		&models.Rating{},
 		&models.Comment{},
+		&models.ChatMessage{},
 	); err != nil {
 		log.Printf("warning: auto-migrate failed (continuing): %v", err)
 	}
@@ -171,8 +172,9 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// Create websocket hub and run it in a separate goroutine
-	wsHub := ws.NewHub()
+	// Create websocket hub with message repository and run it in a separate goroutine
+	chatMessageRepo := ws.NewChatMessageRepository(gdb)
+	wsHub := ws.NewHub(chatMessageRepo)
 	go wsHub.Run()
 
 	// Register WebSocket route
