@@ -25,7 +25,7 @@ func JoinChatRoom(roomID, token string) error {
 	// Build WebSocket URL
 	u := url.URL{
 		Scheme: "ws",
-		Host:   "localhost:8084", // Adjust host/port as needed
+		Host:   "10.238.20.112:8084", // Use the actual server address
 		Path:   "/ws",
 	}
 

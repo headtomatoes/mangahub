@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # MangaHub Stress Test - Real Interaction Benchmarks
 # ============================================================================
 # Tests higher concurrent loads with REAL interactions:
@@ -16,10 +16,15 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-$API_URL = "http://localhost:8084"
-$TCP_HOST = "localhost"
+$API_URL = "http://10.238.20.112:8084"
+$TCP_HOST = "10.238.20.112"
 $TCP_PORT = 8081
-$WS_URL = "ws://localhost:8084/ws"
+$WS_URL = "ws://10.238.20.112:8084/ws"
+
+# Stress test parameters (2x normal load)
+$STRESS_USERS = 200
+$STRESS_TCP_CONNECTIONS = 60
+$STRESS_MANGA_QUERIES = 1000
 
 # ============================================================================
 # Header
@@ -375,7 +380,7 @@ try {
     }
     
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:8084/ws" -Headers $headers -UseBasicParsing -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri "http://10.238.20.112:8084/ws" -Headers $headers -UseBasicParsing -ErrorAction Stop
     } catch [System.Net.WebException] {
         # A 400 or 101 response indicates the WebSocket endpoint is there
         $statusCode = $_.Exception.Response.StatusCode.value__

@@ -15,7 +15,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const refreshBuffer = 5 * 60 // 5 minutes in seconds
+const refreshBuffer = 5 * 60           // 5 minutes in seconds
+const AddressServer string = "0.0.0.0" // Default server address
+const API_PORT string = "8084"         // Default API port
+const GRPC_PORT string = "8083"        // Default gRPC port
+const UDP_PORT string = "8082"         // Default UDP port
+const TCP_PORT string = "8081"         // Default TCP port
+const Prefix string = "http://"        // API prefix
 
 var (
 	apiURL           string                                                                                       //Global flag for API server URL
@@ -103,7 +109,7 @@ func Execute() {
 
 func init() {
 	// Global persistent flags = available to all subcommands
-	defaultURL := "http://localhost:8084"
+	defaultURL := Prefix + AddressServer + ":" + API_PORT
 	if v := os.Getenv("MANGAHUB_API_URL"); v != "" {
 		defaultURL = v
 	}

@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # MangaHub Benchmark Demo Script
 # ============================================================================
 # This script provides an interactive demonstration of all benchmark targets
@@ -17,11 +17,9 @@ param(
 $ErrorActionPreference = "Continue"
 
 # Configuration
-$API_URL = "http://localhost:8084"
-$TCP_HOST = "localhost"
+$API_URL = "http://10.238.20.112:8084"
+$TCP_HOST = "10.238.20.112"
 $TCP_PORT = 8081
-$PROMETHEUS_URL = "http://localhost:9090"
-$GRAFANA_URL = "http://localhost:3000"
 
 # Test user
 $TEST_USER = @{
@@ -107,9 +105,7 @@ function Initialize-Demo {
     
     $services = @(
         @{Name="API Server"; URL="$API_URL/check-conn"},
-        @{Name="Database"; URL="$API_URL/db-ping"},
-        @{Name="Prometheus"; URL="$PROMETHEUS_URL/-/healthy"},
-        @{Name="Grafana"; URL="$GRAFANA_URL/api/health"}
+        @{Name="Database"; URL="$API_URL/db-ping"}
     )
     
     $allHealthy = $true
@@ -137,7 +133,7 @@ function Initialize-Demo {
     if (-not $allHealthy) {
         Write-Host ""
         Write-Host "  ⚠️  Some services are not healthy!" -ForegroundColor Yellow
-        Write-Host "     Run: docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d" -ForegroundColor Gray
+        Write-Host "     Run: docker-compose up -d" -ForegroundColor Gray
         if (-not $Automated) {
             Write-Host ""
             $continue = Read-Host "  Continue anyway? (y/n)"

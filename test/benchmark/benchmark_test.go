@@ -25,9 +25,9 @@ import (
 
 const (
 	// Service endpoints
-	APIBaseURL = "http://localhost:8084"
-	TCPAddr    = "localhost:8081"
-	WSEndpoint = "ws://localhost:8084/ws"
+	APIBaseURL = "http://10.238.20.112:8084"
+	TCPAddr    = "10.238.20.112:8081"
+	WSEndpoint = "ws://10.238.20.112:8084/ws"
 
 	// Test credentials (create a test user first)
 	TestUsername = "benchmarkuser"

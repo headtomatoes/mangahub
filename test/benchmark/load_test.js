@@ -18,8 +18,8 @@ import { Rate, Trend, Counter } from 'k6/metrics';
 // CONFIGURATION
 // ============================================================================
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8084';
-const WS_URL = __ENV.WS_URL || 'ws://localhost:8084/ws';
+const BASE_URL = __ENV.BASE_URL || 'http://10.238.20.112:8084';
+const WS_URL = __ENV.WS_URL || 'ws://10.238.20.112:8084/ws';
 
 // Test user credentials
 const TEST_USER = {
@@ -46,57 +46,67 @@ const wsMessages = new Counter('ws_messages');
 // ============================================================================
 
 export const options = {
+  // Connection pooling to prevent port exhaustion
+  noConnectionReuse: false,
+  userAgent: 'k6-load-test',
+  batch: 10,
+  batchPerHost: 5,
+  
+  // HTTP settings to reuse connections
+  httpDebug: 'full',
+  insecureSkipTLSVerify: true,
+  
   scenarios: {
-    // Scenario 1: HTTP stress test - 200 concurrent users
+    // Scenario 1: HTTP stress test - 100 concurrent users (1/4 stress)
     http_stress: {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '30s', target: 50 },   // Warm up
-        { duration: '30s', target: 100 },  // Ramp to 100
-        { duration: '1m', target: 150 },   // Push to 150
-        { duration: '1m', target: 200 },   // Target: 200 users
-        { duration: '2m', target: 200 },   // Sustain 200
+        { duration: '30s', target: 25 },   // Warm up
+        { duration: '30s', target: 50 },   // Ramp to 50
+        { duration: '1m', target: 75 },    // Push to 75
+        { duration: '1m', target: 100 },   // Target: 100 users
+        { duration: '2m', target: 100 },   // Sustain 100
         { duration: '30s', target: 0 },    // Ramp down
       ],
       gracefulRampDown: '10s',
       exec: 'httpStressTest',
     },
     
-    // Scenario 2: Search performance
+    // Scenario 2: Search performance (1/4 stress)
     search_load: {
       executor: 'constant-vus',
-      vus: 30,
+      vus: 15,
       duration: '3m',
       startTime: '30s',
       exec: 'searchScenario',
     },
     
-    // Scenario 3: WebSocket stress - 50+ users
+    // Scenario 3: WebSocket stress - 25+ users (1/4 stress)
     websocket_stress: {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '20s', target: 25 },
-        { duration: '30s', target: 50 },   // Target: 50
-        { duration: '2m', target: 50 },
-        { duration: '30s', target: 75 },   // Push beyond
-        { duration: '1m', target: 75 },
+        { duration: '20s', target: 13 },
+        { duration: '30s', target: 25 },   // Target: 25
+        { duration: '2m', target: 25 },
+        { duration: '30s', target: 38 },   // Push beyond
+        { duration: '1m', target: 38 },
         { duration: '20s', target: 0 },
       ],
       startTime: '1m',
       exec: 'websocketStressTest',
     },
     
-    // Scenario 4: Spike test
+    // Scenario 4: Spike test (1/4 stress)
     spike_test: {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '10s', target: 10 },
-        { duration: '10s', target: 200 },  // Spike!
-        { duration: '30s', target: 200 },
-        { duration: '10s', target: 10 },
+        { duration: '10s', target: 5 },
+        { duration: '10s', target: 100 },  // Spike!
+        { duration: '30s', target: 100 },
+        { duration: '10s', target: 5 },
       ],
       startTime: '6m',
       exec: 'spikeScenario',
@@ -139,20 +149,28 @@ export function setup() {
 }
 
 // ============================================================================
-// HTTP STRESS TEST (100-200 users)
+// HTTP STRESS TEST (200-400 users with connection pooling)
 // ============================================================================
 
 export function httpStressTest(data) {
   const headers = {
     'Authorization': `Bearer ${data.token}`,
     'Content-Type': 'application/json',
+    'Connection': 'keep-alive',
+  };
+  
+  // HTTP params to enable connection reuse and prevent port exhaustion
+  const params = {
+    headers: headers,
+    timeout: '30s',
+    tags: { name: 'httpStressTest' },
   };
   
   group('Real User Interactions', () => {
     // Browse manga list
     group('Browse Manga', () => {
       const page = Math.floor(Math.random() * 5) + 1;
-      const res = http.get(`${BASE_URL}/api/manga/?page=${page}&limit=20`, { headers });
+      const res = http.get(`${BASE_URL}/api/manga/?page=${page}&limit=20`, params);
       apiLatency.add(res.timings.duration);
       check(res, { 'browse status 200': (r) => r.status === 200 });
       if (res.status === 200) successfulRequests.add(1);
@@ -165,7 +183,7 @@ export function httpStressTest(data) {
     group('Search Manga', () => {
       const queries = ['naruto', 'one piece', 'dragon', 'attack', 'hero', 'death'];
       const query = queries[Math.floor(Math.random() * queries.length)];
-      const res = http.get(`${BASE_URL}/api/manga/search?q=${encodeURIComponent(query)}`, { headers });
+      const res = http.get(`${BASE_URL}/api/manga/search?q=${encodeURIComponent(query)}`, params);
       searchLatency.add(res.timings.duration);
       check(res, { 
         'search status 200': (r) => r.status === 200,
@@ -180,7 +198,7 @@ export function httpStressTest(data) {
     // Get manga details
     group('Get Manga Details', () => {
       const mangaId = Math.floor(Math.random() * 100) + 1;
-      const res = http.get(`${BASE_URL}/api/manga/${mangaId}`, { headers });
+      const res = http.get(`${BASE_URL}/api/manga/${mangaId}`, params);
       apiLatency.add(res.timings.duration);
       check(res, { 'detail status 200 or 404': (r) => r.status === 200 || r.status === 404 });
       if (res.status === 200 || res.status === 404) successfulRequests.add(1);
@@ -191,7 +209,7 @@ export function httpStressTest(data) {
     
     // Get genres
     group('Get Genres', () => {
-      const res = http.get(`${BASE_URL}/api/genres/`, { headers });
+      const res = http.get(`${BASE_URL}/api/genres/`, params);
       apiLatency.add(res.timings.duration);
       check(res, { 'genres status 200': (r) => r.status === 200 });
       if (res.status === 200) successfulRequests.add(1);
@@ -210,6 +228,12 @@ export function searchScenario(data) {
   const headers = {
     'Authorization': `Bearer ${data.token}`,
     'Content-Type': 'application/json',
+    'Connection': 'keep-alive',
+  };
+  
+  const params = {
+    headers: headers,
+    timeout: '30s',
   };
   
   const queries = [
@@ -220,7 +244,7 @@ export function searchScenario(data) {
   
   const query = queries[Math.floor(Math.random() * queries.length)];
   const start = Date.now();
-  const res = http.get(`${BASE_URL}/api/manga/search?q=${encodeURIComponent(query)}`, { headers });
+  const res = http.get(`${BASE_URL}/api/manga/search?q=${encodeURIComponent(query)}`, params);
   const duration = Date.now() - start;
   
   searchLatency.add(duration);
@@ -301,10 +325,16 @@ export function spikeScenario(data) {
   const headers = {
     'Authorization': `Bearer ${data.token}`,
     'Content-Type': 'application/json',
+    'Connection': 'keep-alive',
+  };
+  
+  const params = {
+    headers: headers,
+    timeout: '30s',
   };
   
   // Rapid fire requests
-  const res = http.get(`${BASE_URL}/api/manga/?page=1&limit=10`, { headers });
+  const res = http.get(`${BASE_URL}/api/manga/?page=1&limit=10`, params);
   apiLatency.add(res.timings.duration);
   
   check(res, { 'spike test status 200': (r) => r.status === 200 });

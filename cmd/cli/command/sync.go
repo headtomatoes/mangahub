@@ -327,7 +327,7 @@ func init() {
 	syncCmd.AddCommand(syncDaemonCmd)
 
 	// TCP server flag
-	defaultTCPServer := "localhost:8081"
+	defaultTCPServer := AddressServer + ":" + TCP_PORT
 	if v := os.Getenv("MANGAHUB_TCP_SERVER"); v != "" {
 		defaultTCPServer = v
 	}
