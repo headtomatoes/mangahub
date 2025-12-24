@@ -225,7 +225,7 @@ var grpcProgressUpdateCmd = &cobra.Command{
 
 func init() {
 	// Default gRPC address
-	defaultGRPCAddr := "localhost:8083"
+	defaultGRPCAddr := AddressServer + ":" + GRPC_PORT
 	if v := os.Getenv("MANGAHUB_GRPC_ADDR"); v != "" {
 		defaultGRPCAddr = v
 	}

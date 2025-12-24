@@ -124,7 +124,7 @@ var udpStatsCmd = &cobra.Command{
 
 func init() {
 	// Get UDP server address from environment or use default
-	defaultUDPAddr := "127.0.0.1:8082"
+	defaultUDPAddr := AddressServer + ":" + UDP_PORT
 	if v := os.Getenv("MANGAHUB_UDP_ADDR"); v != "" {
 		defaultUDPAddr = v
 	}
