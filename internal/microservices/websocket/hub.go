@@ -1,9 +1,12 @@
 package websocket
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"mangahub/internal/microservices/http-api/models"
 	"sync"
+	"time"
 )
 
 // Central hub managing all connections and rooms
@@ -12,14 +15,15 @@ import (
 
 // Hub maintains the set of active clients and rooms, sending messages to the clients.
 type Hub struct {
-	Clients    map[string]*Client // Registered clients
-	Rooms      map[int64]*Room    // Active rooms mapped by manga ID
-	Broadcast  chan *Message      // Inbound messages( <- channel) from the clients
-	Register   chan *Client       // Register requests from the clients = join room request
-	Unregister chan *Client       // Unregister requests from clients = leave room request
-	JoinRoom   chan *RoomActions  // Join room action = happened
-	LeaveRoom  chan *RoomActions  // Leave room action = happened
-	mu         sync.RWMutex       // mutex for concurrent access
+	Clients     map[string]*Client    // Registered clients
+	Rooms       map[int64]*Room       // Active rooms mapped by manga ID
+	Broadcast   chan *Message         // Inbound messages( <- channel) from the clients
+	Register    chan *Client          // Register requests from the clients = join room request
+	Unregister  chan *Client          // Unregister requests from clients = leave room request
+	JoinRoom    chan *RoomActions     // Join room action = happened
+	LeaveRoom   chan *RoomActions     // Leave room action = happened
+	mu          sync.RWMutex          // mutex for concurrent access
+	MessageRepo ChatMessageRepository // Repository for storing chat messages
 }
 
 // RoomActions defines actions leave/join on rooms of specific clients
@@ -29,15 +33,16 @@ type RoomActions struct {
 }
 
 // NewHub creates a new Hub
-func NewHub() *Hub {
+func NewHub(messageRepo ChatMessageRepository) *Hub {
 	return &Hub{
-		Clients:    make(map[string]*Client),
-		Rooms:      make(map[int64]*Room),
-		Broadcast:  make(chan *Message, MaxMessageSize/2), // buffered channel to hold messages
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
-		JoinRoom:   make(chan *RoomActions),
-		LeaveRoom:  make(chan *RoomActions),
+		Clients:     make(map[string]*Client),
+		Rooms:       make(map[int64]*Room),
+		Broadcast:   make(chan *Message, MaxMessageSize/2), // buffered channel to hold messages
+		Register:    make(chan *Client),
+		Unregister:  make(chan *Client),
+		JoinRoom:    make(chan *RoomActions),
+		LeaveRoom:   make(chan *RoomActions),
+		MessageRepo: messageRepo,
 	}
 }
 
@@ -189,7 +194,19 @@ func (h *Hub) BroadcastMessage(message *Message) {
 	h.mu.RUnlock()
 	if !exists {
 		slog.Warn("Room not found for broadcasting message", "room_id", message.RoomID)
+		return
 	}
+
+	// Store chat messages in database (only TypeChat, not system messages)
+	if message.Type == TypeChat {
+		if h.MessageRepo != nil {
+			slog.Info("Attempting to store chat message", "room_id", message.RoomID, "type", message.Type)
+			go h.storeChatMessage(message)
+		} else {
+			slog.Error("MessageRepo is nil, cannot store message", "room_id", message.RoomID)
+		}
+	}
+
 	// log the broadcast action
 	slog.Info("Broadcasting message",
 		slog.Int64("room_id", message.RoomID),
@@ -199,6 +216,40 @@ func (h *Hub) BroadcastMessage(message *Message) {
 
 	// broadcast to room
 	room.Broadcast(message)
+}
+
+// storeChatMessage: stores chat message in database
+func (h *Hub) storeChatMessage(message *Message) {
+	slog.Info("storeChatMessage called", "room_id", message.RoomID, "user", message.UserName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chatMsg := &models.ChatMessage{
+		RoomID:    message.RoomID,
+		UserID:    message.UserID,
+		UserName:  message.UserName,
+		Message:   message.Content,
+		CreatedAt: message.Timestamp,
+	}
+
+	slog.Info("Attempting to create chat message in DB",
+		"room_id", chatMsg.RoomID,
+		"user_id", chatMsg.UserID,
+		"user_name", chatMsg.UserName,
+		"message", chatMsg.Message)
+
+	if err := h.MessageRepo.Create(ctx, chatMsg); err != nil {
+		slog.Error("Failed to store chat message in database",
+			"room_id", message.RoomID,
+			"user_id", message.UserID,
+			"error", err)
+	} else {
+		slog.Info("Chat message stored in database successfully",
+			"message_id", chatMsg.ID,
+			"room_id", message.RoomID,
+			"user_name", message.UserName)
+	}
 }
 
 // GetRoom: retrieves a room by ID

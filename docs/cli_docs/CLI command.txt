@@ -198,3 +198,51 @@ TCP------------------------------------------------------------------------
 
 
 mangahub progress sync --manga-id <id> --chapter <num> --status <status>
+
+
+WebSocket (Chat Room)------------------------------------------------------------------------
+
+# Join a manga chat room
+./mangahub chat join --room <manga-id>
+./mangahub chat join -r <manga-id>
+
+# Join with explicit token (if not logged in)
+./mangahub chat join --room 1 --token <jwt-token>
+./mangahub chat join -r 1 -t <jwt-token>
+
+# Examples
+./mangahub chat join --room 1
+./mangahub chat join -r 55
+
+# Chat room workflow
+# 1. Login first
+./mangahub auth login -u 'username' -p 'password'
+
+# 2. Join a chat room (use manga ID as room ID)
+./mangahub chat join --room 1
+
+# 3. In the chat:
+#    - Type messages and press Enter to send
+#    - Type '/quit' to exit the chat room
+
+# Multi-user testing (requires 2 terminals)
+# Terminal 1 (Alice):
+./mangahub auth login -u 'alice' -p 'testpass123'
+./mangahub chat join --room 1
+
+# Terminal 2 (Bob):
+./mangahub auth login -u 'bob' -p 'testpass123'
+./mangahub chat join --room 1
+
+# Expected behavior:
+# - When Bob joins, Alice sees: 🔔 [bob] has joined the chat.
+# - Messages from Alice appear in Bob's terminal as: [alice] <message>
+# - Messages from Bob appear in Alice's terminal as: [bob] <message>
+# - When Alice types '/quit', Bob sees: 🔔 [alice] has left the chat.
+
+# Testing different rooms (messages should NOT cross between rooms)
+# Terminal 1:
+./mangahub chat join --room 1
+
+# Terminal 2:
+./mangahub chat join --room 2

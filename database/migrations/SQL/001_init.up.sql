@@ -94,11 +94,19 @@ CREATE TABLE user_progress (
 -- ========================================
 CREATE TABLE chat_messages (
     id BIGSERIAL PRIMARY KEY,
+    room_id BIGINT NOT NULL,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_name TEXT NOT NULL,
     message TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_chat_messages_room_id ON chat_messages(room_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
+
+-- Optional: Add foreign key if you want to restrict to existing manga only
+-- ALTER TABLE chat_messages ADD CONSTRAINT fk_chat_messages_room_id 
+-- FOREIGN KEY (room_id) REFERENCES manga(id) ON DELETE CASCADE;
 
 -- ========================================
 -- REFRESH TOKENS

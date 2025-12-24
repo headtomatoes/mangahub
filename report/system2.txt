@@ -1,0 +1,61 @@
+flowchart TB
+    CLI["CLI Tool"]
+
+    subgraph Protocols["5 Network Protocols"]
+        direction LR
+        HTTP["HTTP :8084<br/>REST API"]
+        WS["WS :8084/ws<br/>Chat"]
+        GRPC["gRPC :8083<br/>Sync"]
+        TCP["TCP :8081<br/>Progress Stream<br/>+ Redis Cache"]
+        UDP["UDP :8082,:8085<br/>Notifications"]
+    end
+
+    subgraph Storage["Storage & Cache"]
+        direction TB
+        REDIS[("Redis Cache<br/>:6379<br/>• Progress data<br/>• Session state<br/>• TTL: 1 hour")]
+        DB[("PostgreSQL<br/>:5432<br/>• Persistent data<br/>• Full records")]
+    end
+
+    subgraph Background["Background Services"]
+        SYNC["MangaDex & AniList<br/>Sync Workers"]
+    end
+
+    API["External APIs<br/>MangaDex | AniList"]
+
+    %% Client connections
+    CLI -->|REST| HTTP
+    CLI -->|WebSocket| WS
+    CLI -->|RPC| GRPC
+    CLI -->|Stream| TCP
+    CLI <-.->|Datagram| UDP
+
+    %% Protocol to storage
+    HTTP --> DB
+    WS --> DB
+    GRPC --> DB
+    UDP --> DB
+
+    %% TCP caching flow
+    TCP -->|"1. Check Cache"| REDIS
+    REDIS -.->|"Cache Hit<br/>(Return cached)"| TCP
+    REDIS -.->|"Cache Miss"| DB
+    DB -.->|"Query & Cache"| REDIS
+    TCP -->|"Write-through"| DB
+
+    %% Background jobs
+    SYNC -->|Fetch| API
+    SYNC -->|Store| DB
+    SYNC -->|Invalidate Cache| REDIS
+    SYNC -->|Alert| UDP
+
+    %% Styling
+    style CLI fill:#4fc3f7,stroke:#0288d1,stroke-width:2px,color:#000
+    style HTTP fill:#ffb74d,stroke:#f57c00,stroke-width:2px,color:#000
+    style WS fill:#ffb74d,stroke:#f57c00,stroke-width:2px,color:#000
+    style GRPC fill:#ffb74d,stroke:#f57c00,stroke-width:2px,color:#000
+    style TCP fill:#ffb74d,stroke:#f57c00,stroke-width:2px,color:#000
+    style UDP fill:#ffb74d,stroke:#f57c00,stroke-width:2px,color:#000
+    style REDIS fill:#ff6b6b,stroke:#c92a2a,stroke-width:3px,color:#fff
+    style DB fill:#ba68c8,stroke:#8e24aa,stroke-width:3px,color:#fff
+    style SYNC fill:#81c784,stroke:#388e3c,stroke-width:2px,color:#000
+    style API fill:#e57373,stroke:#d32f2f,stroke-width:2px,color:#000
