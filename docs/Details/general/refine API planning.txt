@@ -1,0 +1,7 @@
+- refine the get all mangas: return basic infor: title, author, status, and total chapters - done
+- get specific manga by id: return all attributes - done
+- restrict only admin can create or delete, update manga - done
+- delete retrieve genres, update genres - done
+- add rating and comments - done
+- add cli for missing apis, and fix for any changes - done
+- 

@@ -1,0 +1,84 @@
+# 1. Search by title
+GET /api/manga/advanced-search?q=naruto
+
+# 2. Search by author
+GET /api/manga/advanced-search?q=oda
+
+# 3. Multi-word search (all words must match)
+GET /api/manga/advanced-search?q=one+piece
+
+# 4. Search in description
+GET /api/manga/advanced-search?q=pirates+adventure
+
+# 5. Show only ongoing manga
+GET /api/manga/advanced-search?status=ongoing
+
+# 6. Show only completed manga
+GET /api/manga/advanced-search?status=completed
+
+# 7. Show manga on hiatus
+GET /api/manga/advanced-search?status=hiatus
+
+# 8. Filter by single genre (by name)
+GET /api/manga/advanced-search?genres=action
+
+# 9. Filter by multiple genres (must have ALL genres)
+GET /api/manga/advanced-search?genres=action,adventure
+
+# 10. Filter by genre ID
+GET /api/manga/advanced-search?genres=1
+
+# 11. Mix genre IDs and names
+GET /api/manga/advanced-search?genres=1,action,3
+
+# 12. Manga with rating >= 8.0
+GET /api/manga/advanced-search?min_rating=8.0
+
+# 13. Highly rated manga (9+)
+GET /api/manga/advanced-search?min_rating=9.0
+
+# 14. Any rated manga (>0)
+GET /api/manga/advanced-search?min_rating=0.1
+
+# 15. Sort by highest rating
+GET /api/manga/advanced-search?sort_by=rating
+
+# 16. Sort by popularity (also uses rating)
+GET /api/manga/advanced-search?sort_by=popularity
+
+# 17. Sort by most recent
+GET /api/manga/advanced-search?sort_by=recent
+
+# 18. Sort alphabetically
+GET /api/manga/advanced-search?sort_by=title
+
+# 19. First page with 10 items
+GET /api/manga/advanced-search?page=1&page_size=10
+
+# 20. Second page with 20 items
+GET /api/manga/advanced-search?page=2&page_size=20
+
+# 21. Large page size (max 100)
+GET /api/manga/advanced-search?page_size=100
+
+# 22. Ongoing action manga with high rating
+GET /api/manga/advanced-search?status=ongoing&genres=action&min_rating=8.0
+
+# 23. Search "naruto" in completed manga
+GET /api/manga/advanced-search?q=naruto&status=completed
+
+# 24. Action/Adventure manga sorted by rating
+GET /api/manga/advanced-search?genres=action,adventure&sort_by=rating
+
+# 25. Recent ongoing manga with genres
+GET /api/manga/advanced-search?status=ongoing&genres=action&sort_by=recent
+
+# 26. Highly rated completed manga (paginated)
+GET /api/manga/advanced-search?status=completed&min_rating=9.0&sort_by=rating&page=1&page_size=20
+
+# 27. Search with multiple filters + pagination
+GET /api/manga/advanced-search?q=demon&genres=action,horror&status=ongoing&min_rating=7.5&sort_by=popularity&page=2&page_size=15
+
+# 28. Full text search + status + rating + sort
+GET /api/manga/advanced-search?q=hero+academy&status=ongoing&min_rating=8.5&sort_by=recent
+

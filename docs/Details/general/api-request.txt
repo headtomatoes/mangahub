@@ -1,0 +1,9 @@
+GET /api/manga
+GET http://localhost:8084/api/manga
+GET http://localhost:8084/api/manga?page=2
+GET http://localhost:8084/api/manga?page_size=50
+GET http://localhost:8084/api/manga?page=3&page_size=10
+GET http://localhost:8084/api/manga?page=1&page_size=100
+GET http://localhost:8084/api/manga/search?q=one+piece
+GET http://localhost:8084/api/manga/search?title=naruto
+ 

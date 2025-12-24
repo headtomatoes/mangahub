@@ -1,0 +1,152 @@
+# WebSocket Chatroom Testing Script
+# This script helps test the WebSocket chatroom functionality
+
+param(
+    [Parameter(Mandatory=$false)]
+    [ValidateSet('setup', 'test-single', 'test-multi', 'cleanup')]
+    [string]$Action = 'menu'
+)
+
+$ErrorActionPreference = "Continue"
+$CLI_PATH = ".\cmd\cli\mangahub.exe"
+
+function Show-Menu {
+    Write-Host "`n=== WebSocket Chatroom Test Menu ===" -ForegroundColor Cyan
+    Write-Host "1. Setup - Create test users (alice & bob)" -ForegroundColor Yellow
+    Write-Host "2. Test Single User - Join and leave chatroom" -ForegroundColor Yellow
+    Write-Host "3. Test Multi User - Requires 2 terminals (Instructions only)" -ForegroundColor Yellow
+    Write-Host "4. Quick Join - Join chatroom as current user" -ForegroundColor Yellow
+    Write-Host "5. Cleanup - Remove test users" -ForegroundColor Yellow
+    Write-Host "6. Exit" -ForegroundColor Yellow
+    Write-Host "================================`n" -ForegroundColor Cyan
+}
+
+function Setup-TestUsers {
+    Write-Host "`n[SETUP] Creating test users..." -ForegroundColor Green
+    
+    # Create Alice
+    Write-Host "`nCreating user: alice" -ForegroundColor Cyan
+    & $CLI_PATH auth register --username alice --email alice@test.com --password testpass123
+    Start-Sleep -Seconds 1
+    
+    Write-Host "`nLogging in as alice" -ForegroundColor Cyan
+    & $CLI_PATH auth login --username alice --password testpass123
+    Start-Sleep -Seconds 1
+    
+    # Create Bob
+    Write-Host "`nCreating user: bob" -ForegroundColor Cyan
+    & $CLI_PATH auth register --username bob --email bob@test.com --password testpass123
+    Start-Sleep -Seconds 1
+    
+    Write-Host "`nLogging in as bob" -ForegroundColor Cyan
+    & $CLI_PATH auth login --username bob --password testpass123
+    
+    Write-Host "`n✅ Test users created successfully!" -ForegroundColor Green
+    Write-Host "   - alice (alice@test.com / testpass123)" -ForegroundColor White
+    Write-Host "   - bob (bob@test.com / testpass123)" -ForegroundColor White
+}
+
+function Test-SingleUser {
+    Write-Host "`n[TEST] Single User Chatroom Test" -ForegroundColor Green
+    Write-Host "This test will join a chatroom as alice and then exit.`n" -ForegroundColor Yellow
+    
+    # Login as alice first
+    Write-Host "Logging in as alice..." -ForegroundColor Cyan
+    & $CLI_PATH auth login --username alice --password testpass123
+    Start-Sleep -Seconds 1
+    
+    Write-Host "`nJoining chatroom (room ID: 1)..." -ForegroundColor Cyan
+    Write-Host "Type some messages, then type '/quit' to exit`n" -ForegroundColor Yellow
+    
+    & $CLI_PATH chat join --room 1
+}
+
+function Show-MultiUserInstructions {
+    Write-Host "`n[TEST] Multi-User Chatroom Test Instructions" -ForegroundColor Green
+    Write-Host "================================================================" -ForegroundColor Cyan
+    Write-Host "`nThis test requires TWO PowerShell terminals running simultaneously.`n" -ForegroundColor Yellow
+    
+    Write-Host "TERMINAL 1 (Alice):" -ForegroundColor Magenta
+    Write-Host "  cd C:\Project\Go\mangahub" -ForegroundColor White
+    Write-Host "  .\cmd\cli\mangahub.exe auth login --username alice --password testpass123" -ForegroundColor White
+    Write-Host "  .\cmd\cli\mangahub.exe chat join --room 1" -ForegroundColor White
+    
+    Write-Host "`nTERMINAL 2 (Bob):" -ForegroundColor Magenta
+    Write-Host "  cd C:\Project\Go\mangahub" -ForegroundColor White
+    Write-Host "  .\cmd\cli\mangahub.exe auth login --username bob --password testpass123" -ForegroundColor White
+    Write-Host "  .\cmd\cli\mangahub.exe chat join --room 1" -ForegroundColor White
+    
+    Write-Host "`nEXPECTED BEHAVIOR:" -ForegroundColor Green
+    Write-Host "  ✓ When Bob joins, Alice should see: 🔔 [bob] has joined the chat." -ForegroundColor White
+    Write-Host "  ✓ Messages sent by Alice appear in Bob's terminal as: [alice] <message>" -ForegroundColor White
+    Write-Host "  ✓ Messages sent by Bob appear in Alice's terminal as: [bob] <message>" -ForegroundColor White
+    Write-Host "  ✓ When Alice types '/quit', Bob should see: 🔔 [alice] has left the chat." -ForegroundColor White
+    
+    Write-Host "`nTEST SCENARIOS:" -ForegroundColor Cyan
+    Write-Host "  1. Both users send messages back and forth" -ForegroundColor White
+    Write-Host "  2. One user disconnects (/quit) - other should see notification" -ForegroundColor White
+    Write-Host "  3. Test different rooms (--room 2 vs --room 1) - messages should NOT cross" -ForegroundColor White
+    
+    Write-Host "`n================================================================" -ForegroundColor Cyan
+    Write-Host "Press any key to continue..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
+
+function Quick-Join {
+    Write-Host "`n[QUICK JOIN] Join chatroom as current logged-in user" -ForegroundColor Green
+    
+    $roomID = Read-Host "Enter Room ID (default: 1)"
+    if ([string]::IsNullOrWhiteSpace($roomID)) {
+        $roomID = "1"
+    }
+    
+    Write-Host "`nJoining room $roomID..." -ForegroundColor Cyan
+    Write-Host "Type messages and press Enter. Type '/quit' to exit.`n" -ForegroundColor Yellow
+    
+    & $CLI_PATH chat join --room $roomID
+}
+
+function Cleanup-TestUsers {
+    Write-Host "`n[CLEANUP] Removing test users..." -ForegroundColor Yellow
+    Write-Host "Note: This requires direct database access or admin API." -ForegroundColor Red
+    Write-Host "Test users (alice, bob) will persist until manually removed from DB." -ForegroundColor White
+    Write-Host "`nTo manually cleanup, run:" -ForegroundColor Cyan
+    Write-Host "  docker exec -it mangahub-db-1 psql -U mangahub -d mangahub -c `"DELETE FROM users WHERE username IN ('alice', 'bob');`"" -ForegroundColor White
+}
+
+# Main execution logic
+switch ($Action) {
+    'setup' { 
+        Setup-TestUsers 
+    }
+    'test-single' { 
+        Test-SingleUser 
+    }
+    'test-multi' { 
+        Show-MultiUserInstructions 
+    }
+    'cleanup' { 
+        Cleanup-TestUsers 
+    }
+    'menu' {
+        while ($true) {
+            Show-Menu
+            $choice = Read-Host "Select option (1-6)"
+            
+            switch ($choice) {
+                '1' { Setup-TestUsers; Start-Sleep -Seconds 2 }
+                '2' { Test-SingleUser }
+                '3' { Show-MultiUserInstructions }
+                '4' { Quick-Join }
+                '5' { Cleanup-TestUsers; Start-Sleep -Seconds 2 }
+                '6' { 
+                    Write-Host "`nExiting..." -ForegroundColor Green
+                    exit 0
+                }
+                default { 
+                    Write-Host "Invalid option. Please select 1-6." -ForegroundColor Red
+                }
+            }
+        }
+    }
+}
