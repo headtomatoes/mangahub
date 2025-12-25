@@ -1,0 +1,109 @@
+# syntax=docker/dockerfile:1.7
+
+# ============================================
+# Stage 1: Base builder with dependencies
+# - Uses BuildKit cache mounts for faster builds
+# - Keeps toolchain for protobuf and CGO if needed
+# ============================================
+ARG GO_VERSION=1.25
+FROM golang:${GO_VERSION}-alpine AS base
+
+RUN apk add --no-cache git make protobuf protobuf-dev gcc musl-dev ca-certificates tzdata \
+	&& update-ca-certificates
+
+WORKDIR /app
+
+# Copy go mod files first to leverage caching
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# ============================================
+# Stage 2: Development (with Air)
+# ============================================
+FROM base AS development
+
+# Install Air for hot reload
+RUN go install github.com/air-verse/air@latest
+
+# Expose service ports used during development
+EXPOSE 8081 8082 8083 8084 8085
+
+# Command kept unchanged (compose will override per service)
+CMD ["air", "-c", ".air.api.toml"]
+
+# ============================================
+# Stage 3: Common Builder (build all binaries)
+# ============================================
+FROM base AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH
+ARG VERSION=local
+ENV CGO_ENABLED=0 \
+	GOOS=${TARGETOS}
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	mkdir -p /out \
+	&& go build -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" -o /out/api-server ./cmd/api-server \
+	&& go build -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" -o /out/tcp-server ./cmd/tcp-server \
+	&& go build -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" -o /out/udp-server ./cmd/udp-server \
+	&& go build -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" -o /out/grpc-server ./cmd/grpc-server \
+	&& go build -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" -o /out/mangadex-sync ./cmd/mangadex-sync \
+	&& go build -trimpath -ldflags "-s -w -buildid= -X main.version=${VERSION}" -o /out/anilist-sync ./cmd/anilist_sync
+
+# ============================================
+# Stage 4: Test stage (optional)
+# ============================================
+FROM base AS test
+RUN --mount=type=cache,target=/go/pkg/mod \
+	--mount=type=cache,target=/root/.cache/go-build \
+	go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+# ============================================
+# Final Stages: Production Runtime (minimal, non-root)
+# ============================================
+FROM alpine:3.20 AS runtime-base
+RUN apk --no-cache add ca-certificates tzdata \
+	&& adduser -D -u 10001 appuser
+WORKDIR /root/
+USER appuser
+
+# API Server runtime
+FROM runtime-base AS production-api
+COPY --from=builder /out/api-server ./api-server
+EXPOSE 8084
+CMD ["./api-server"]
+
+# TCP Server runtime
+FROM runtime-base AS production-tcp
+COPY --from=builder /out/tcp-server ./tcp-server
+EXPOSE 8081
+CMD ["./tcp-server"]
+
+# UDP Server runtime
+FROM runtime-base AS production-udp
+COPY --from=builder /out/udp-server ./udp-server
+EXPOSE 8082 8085
+CMD ["./udp-server"]
+
+# gRPC Server runtime
+FROM runtime-base AS production-grpc
+COPY --from=builder /out/grpc-server ./grpc-server
+EXPOSE 8083
+CMD ["./grpc-server"]
+
+# MangaDex Sync runtime
+FROM runtime-base AS production-mangadex-sync
+COPY --from=builder /out/mangadex-sync ./mangadex-sync
+CMD ["./mangadex-sync"]
+
+# AniList Sync runtime
+FROM runtime-base AS production-anilist-sync
+COPY --from=builder /out/anilist-sync ./anilist-sync
+CMD ["./anilist-sync"]
+

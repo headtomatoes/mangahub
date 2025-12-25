@@ -43,6 +43,7 @@ services:
   api-server:
     build:
       context: .
+      dockerfile: Dockerfile.optimized
       target: ${GO_ENV:-development}
     container_name: mangahub-api
     restart: always
@@ -71,6 +72,7 @@ services:
   tcp-server:
     build:
       context: .
+      dockerfile: Dockerfile.optimized
       target: ${GO_ENV:-development}
     container_name: mangahub-tcp
     restart: always
@@ -95,6 +97,7 @@ services:
   udp-server:
     build:
       context: .
+      dockerfile: Dockerfile.optimized
       target: ${GO_ENV:-development}
     container_name: mangahub-udp
     restart: always
@@ -121,6 +124,7 @@ services:
   grpc-server:
     build:
       context: .
+      dockerfile: Dockerfile.optimized
       target: ${GO_ENV:-development}
     container_name: mangahub-grpc
     restart: always
@@ -145,7 +149,7 @@ services:
   mangadex-sync:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.optimized
       target: ${GO_ENV:-development}
     container_name: mangahub-mangadex-sync
     restart: always
@@ -178,7 +182,7 @@ services:
   anilist-sync:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.optimized
       target: ${GO_ENV:-development}
     container_name: mangahub-anilist-sync
     restart: always
@@ -201,57 +205,57 @@ services:
       - mangahub-network
 
   # Prometheus (Optional monitoring)
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: mangahub-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    networks:
-      - mangahub-network
-    profiles:
-      - monitoring
+#   prometheus:
+#     image: prom/prometheus:latest
+#     container_name: mangahub-prometheus
+#     ports:
+#       - "9090:9090"
+#     volumes:
+#       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+#       - prometheus_data:/prometheus
+#     networks:
+#       - mangahub-network
+#     profiles:
+#       - monitoring
 
-  # Grafana (Optional monitoring)
-  grafana:
-    image: grafana/grafana:latest
-    container_name: mangahub-grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
-    networks:
-      - mangahub-network
-    profiles:
-      - monitoring
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: mangahub-pgadmin
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: trongle250504@gmail.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - mangahub-network
-    depends_on:
-      db:
-        condition: service_healthy
-volumes:
-  postgres_data:
-  redis_data:
-  prometheus_data:
-  grafana_data:
-  pgadmin_data:
+#   # Grafana (Optional monitoring)
+#   grafana:
+#     image: grafana/grafana:latest
+#     container_name: mangahub-grafana
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       - grafana_data:/var/lib/grafana
+#     environment:
+#       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+#     networks:
+#       - mangahub-network
+#     profiles:
+#       - monitoring
+#   pgadmin:
+#     image: dpage/pgadmin4:latest
+#     container_name: mangahub-pgadmin
+#     restart: always
+#     environment:
+#       PGADMIN_DEFAULT_EMAIL: trongle250504@gmail.com
+#       PGADMIN_DEFAULT_PASSWORD: admin123
+#       PGADMIN_CONFIG_SERVER_MODE: 'False'
+#     ports:
+#       - "5050:80"
+#     volumes:
+#       - pgadmin_data:/var/lib/pgadmin
+#     networks:
+#       - mangahub-network
+#     depends_on:
+#       db:
+#         condition: service_healthy
+# volumes:
+#   postgres_data:
+#   redis_data:
+#   prometheus_data:
+#   grafana_data:
+#   pgadmin_data:
 
-networks:
-  mangahub-network:
-    driver: bridge
+# networks:
+#   mangahub-network:
+#     driver: bridge
